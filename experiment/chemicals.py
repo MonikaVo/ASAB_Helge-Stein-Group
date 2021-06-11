@@ -52,11 +52,11 @@ class chemical():
 
 
     
-def getChemicalsList(dataFile):
+def getChemicalsList(dataFile):         #input: .csv-file, output: dict
     ''' This function loads the .csv database including the information regarding the chemicals and generates objects of the chemicals class. A dictionary containing all the chemicals listed in the database is returned using the NameShort in the database as keys. '''
-    chemInfo = pd.read_csv(dataFile, sep=";")
+    chemInfo = pd.read_csv(dataFile, sep=";")       
     chemList = {}
-    for i in chemInfo.index:
+    for i in chemInfo.index:        #write each chemical as object into the dict
         chem = chemical(chemInfo.loc[i, "NameShort"], chemInfo.loc[i, "NameLong"], chemInfo.loc[i, "Density at 20 degreeC / g/cm3"], chemInfo.loc[i, "Molar mass / g/mol"])
         chemList[chemInfo.loc[i, "NameShort"]] = chem
     # save the chemList dictionary in order to be able to load once it is generated. It does not need to be newly generated, if no changes in the database occured.
