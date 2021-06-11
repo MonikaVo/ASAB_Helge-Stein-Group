@@ -11,11 +11,11 @@ def SaveToFile(filename, data):
 class chemical():
     ''' This class defines chemicals in a way to determine the required volume in order to achieve a certain mixing ratio and to evaluate their compatibility with the ASAB setup. '''
 
-     def __init__(self, nameShort, nameLong, density, molarMass):
+    def __init__(self, nameShort, nameLong, density, molarMass):
         # Initialize a class object with the specified properties
         self.nameShort = nameShort
         self.nameLong = nameLong
-        self.density20 = density
+        self.density = density
         self.molarMass = molarMass
 
 ''' RELEVANT FOR FUTURE DEVELOPMENT '''
@@ -49,9 +49,7 @@ class chemical():
 
     # def removeInfo(self, info, x):
     #     getattr(self, info, x).remove(x)
-
-
-    
+ 
 def getChemicalsList(dataFile):         #input: .csv-file, output: dict
     ''' This function loads the .csv database including the information regarding the chemicals and generates objects of the chemicals class. A dictionary containing all the chemicals listed in the database is returned using the NameShort in the database as keys. '''
     chemInfo = pd.read_csv(dataFile, sep=";")       
@@ -63,7 +61,7 @@ def getChemicalsList(dataFile):         #input: .csv-file, output: dict
     SaveToFile("chemList", chemList)
     return chemList
 
-def loadChemicalsList(file_chemList):
+def loadChemicalsList(file_chemList):   #input: path to pickle file
     ''' This function loads a saved chemList object. '''
     load_file = open(file_chemList, 'rb')
     out = pickle.load(load_file)
