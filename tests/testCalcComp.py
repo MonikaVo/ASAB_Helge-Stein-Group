@@ -1,26 +1,85 @@
-import calcComp
-import chemicals
+import sys
+sys.path.append(r"..")      # https://stackoverflow.com/questions/4383571/importing-files-from-different-folder
+from experiment import calcComp
+from experiment import chemicals
 import unittest
 import numpy as np
 
+'''
+class chemical():
+    def __init__(self, density, molarMass):
+        self.density = density
+        self.molarMass = molarMass
 
-#chemList = chemicals.getChemicalsList("Chemicals_database.csv")
+ethanol = chemical(0.7893, 46.07)
+water = chemical(0.9982, 18.02)
+hexane = chemical(0.66 ,86.18)
+toluene = chemical(0.87, 92.14)
+acetone = chemical(0.7845, 58.08)
+
+chemList = {                #https://realpython.com/python-dicts/
+    "EtOH" : ethanol,
+    "H2O" : water,
+    "hexane" : hexane,
+    "toluene" : toluene,
+    "acetone" : acetone
+}
+
+mixratio = [7, 15, 9]
+components = ["acetone", "toluene", "hexane"]
+amount = 18
+
+
+
+def calcComp(chemicals, mixratio, components, amount):
+    #chemicals is a dict, key is the name of the chemical, the resulting object has functions .density and .molarMass
+    #mixratio is a list, containing the ratio of each component. it doesn't have to add up to one
+    #components is a list, containing the names of the chemicals
+    #amount is the total amount of solution needed
+    #output: vol is a list, containing the volume of each component
+    mixratio_norm = []      #create a normalized mixratio list, called mixratio_norm
+    for i in range(len(mixratio)):
+        mixratio_norm = mixratio_norm + [mixratio[i]/sum(mixratio)]     #https://www.codespeedy.com/how-to-add-all-numbers-in-a-list-in-python/
+    M = []      #List including molar masses
+    for i in range(len(components)):
+        M = M + [chemList[components[i]].molarMass]   #get the molar mass of each component
+    rho = []        #List including densities
+    for i in range(len(components)):
+        rho = rho + [chemList[components[i]].density]      #get the density of each component      https://www.w3schools.com/python/python_classes.asp
+    volcalc = 0     #Calculate volume fraction-denominator
+    for i in range(len(components)):
+        volcalc = volcalc + mixratio_norm[i] * M[i] / rho[i]
+    vol = []        #list which will contain volumes of all components
+    for i in range(len(components)):
+        vol = vol + [mixratio_norm[i] * M[i] / rho[i] / volcalc * amount]
+        vol[i] = round(vol[i], 6)       #used to round the values to six decimals
+    return vol
+
+
+result = calcComp(chemicals, mixratio, components, amount)
+print(result)
+
+'''
+#chemList = chemicals.getChemicalsList("..\\experiment\\Chemicals_database.csv")
 chemList = chemicals.loadChemicalsList("chemList")
 
+print(chemList)
 
-# https://stackoverflow.com/questions/12136762/assertalmostequal-in-python-unit-test-for-collections-of-floats#12139899
-#https://data-flair.training/blogs/python-unittest/
+def test_calcComp():
+    # https://stackoverflow.com/questions/12136762/assertalmostequal-in-python-unit-test-for-collections-of-floats#12139899
+    np.testing.assert_almost_equal(calcComp.calcComp(chemList, [1, 1], ["EtOH", "H2O"], 2.0), [1.527549, 0.472451], decimal=5)
+    np.testing.assert_almost_equal(calcComp.calcComp(chemList, [0.5, 0.5], ["EtOH", "H2O"], 2.0), [1.527549, 0.472451], decimal=5)
+    np.testing.assert_almost_equal(calcComp.calcComp(chemList, [1, 2], ["hexane", "EtOH"], 1.0), [0.52798, 0.47202], decimal=5)
+    np.testing.assert_almost_equal(calcComp.calcComp(chemList, [1, 2], ["hexane", "EtOH"], 0.5), [0.26399, 0.23601], decimal=5)
+    np.testing.assert_almost_equal(calcComp.calcComp(chemList, [0.2, 0.7, 0.1], ["EtOH", "H2O", "hexane"], 1), [0.312397, 0.338171, 0.349432], decimal=5)
+    np.testing.assert_almost_equal(calcComp.calcComp(chemList, [7, 15, 9], ["acetone", "toluene", "hexane"], 18),[2.82555, 8.7222 , 6.45225], decimal=5)
 
-class t_calcComp:
-    def test():
-        np.testing.assert_almost_equal(calcComp.calcComp(chemList, [1, 1], ["EtOH", "H2O"], 2.0), [1.527549, 0.472451], decimal=5)
-        np.testing.assert_almost_equal(calcComp.calcComp(chemList, [0.5, 0.5], ["EtOH", "H2O"], 2.0), [1.527549, 0.472451], decimal=5)
-        np.testing.assert_almost_equal(calcComp.calcComp(chemList, [1, 2], ["hexane", "EtOH"], 1.0), [0.52798, 0.47202], decimal=5)
-        np.testing.assert_almost_equal(calcComp.calcComp(chemList, [1, 2], ["hexane", "EtOH"], 0.5), [0.26399, 0.23601], decimal=5)
-        np.testing.assert_almost_equal(calcComp.calcComp(chemList, [0.2, 0.7, 0.1], ["EtOH", "H2O", "hexane"], 1), [0.312397, 0.338171, 0.349432], decimal=5)
-        np.testing.assert_almost_equal(calcComp.calcComp(chemList, [7, 15, 9], ["acetone", "toluene", "hexane"], 18),[2.82555, 8.7222 , 6.45225], decimal=5)
+test_calcComp()
 
 
+#class Test(unittest.TestCase):           #https://data-flair.training/blogs/python-unittest/
+#    def testCalcComp(self):
+#       np.testing.assert_almost_equal(calcComp.calcComp(chemList, [1, 1], ["EtOH", "H2O"], 2.0), [1.527549, 0.472451])
 #    def testCalcComp(self):
 #        self.assertEqual(calcComp.calcComp(chemList, [0.5, 0.5], ["EtOH", "H2O"], 2.0), [1.527549, 0.472451])
 #    def testCalcComp2(self):
@@ -33,9 +92,6 @@ class t_calcComp:
 #        self.assertEqual(calcComp.calcComp(chemList, [0.2, 0.7, 0.1], ["EtOH", "H2O", "hexane"], 1), [0.312397, 0.338171, 0.349432])
 #    def testCalcComp6(self):
 #        self.assertEqual(calcComp.calcComp(chemList, [7, 15, 9], ["acetone", "toluene", "hexane"], 18), [2.842234, 8.712612, 6.445153])
-
-
-t_calcComp.test()
 
 #if __name__ == '__main__':
 #    unittest.main
