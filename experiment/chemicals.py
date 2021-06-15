@@ -1,12 +1,16 @@
 import pandas as pd
+import os 
+cwd = os.getcwd()
+print(cwd)
 import pickle
+import sys
+sys.path.append(r"../tests")
+sys.path.append(r"../experiment")
 
 # Supporting functions
 def SaveToFile(filename, data):
-    out_file = open(filename, 'wb')
-    pickle.dump(data, out_file)
-    out_file.close()
-
+    with open(filename, 'wb') as out_file:
+        pickle.dump(data, out_file) # https://stackoverflow.com/questions/20101021/how-to-close-the-file-after-pickle-load-in-python
     
 class chemical():
     ''' This class defines chemicals in a way to determine the required volume in order to achieve a certain mixing ratio and to evaluate their compatibility with the ASAB setup. '''
@@ -18,7 +22,7 @@ class chemical():
         self.density = density
         self.molarMass = molarMass
 
-''' RELEVANT FOR FUTURE DEVELOPMENT '''
+        ''' RELEVANT FOR FUTURE DEVELOPMENT '''
         # self.chemFormula = smiles
         # self.flashPoint = flashPoint
         # self.decompTemp = decompositionTemp
@@ -58,12 +62,15 @@ def getChemicalsList(dataFile):         #input: .csv-file, output: dict
         chem = chemical(chemInfo.loc[i, "NameShort"], chemInfo.loc[i, "NameLong"], chemInfo.loc[i, "Density at 20 degreeC / g/cm3"], chemInfo.loc[i, "Molar mass / g/mol"])
         chemList[chemInfo.loc[i, "NameShort"]] = chem
     # save the chemList dictionary in order to be able to load once it is generated. It does not need to be newly generated, if no changes in the database occured.
-    SaveToFile("chemList", chemList)
+    SaveToFile("chemList.pck", chemList)
+    
     return chemList
 
 def loadChemicalsList(file_chemList):   #input: path to pickle file
     ''' This function loads a saved chemList object. '''
-    load_file = open(file_chemList, 'rb')
-    out = pickle.load(load_file)
-    load_file.close()
+    print(os.getcwd())
+    with open(file_chemList, 'rb') as load_file:
+        print(os.getcwd())
+        out = pickle.load(load_file)
+        print(os.getcwd())
     return out

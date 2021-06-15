@@ -5,10 +5,10 @@ from experiment import calcComp, chemicals
 
 #create dict chemList including objects of class chemicals
 #only necessary, if "Chemicals_database.csv" changed
-#chemList = chemicals.getChemicalsList("Chemicals_database.csv")           #https://coderslegacy.com/import-class-from-python-file/, https://www.geeksforgeeks.org/python-read-csv-using-pandas-read_csv/
+#chemList = chemicals.getChemicalsList("experiment/Chemicals_database.csv")           #https://coderslegacy.com/import-class-from-python-file/, https://www.geeksforgeeks.org/python-read-csv-using-pandas-read_csv/
 
 #load chemList
-chemList = chemicals.loadChemicalsList(r"chemList")
+chemList = chemicals.loadChemicalsList(r"chemList.pck")
 
 #just for testing
 amount = 1.0
