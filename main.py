@@ -21,13 +21,13 @@ class Syringe:
 
 #define each available syringe
 syringe25 = Syringe(23.0329, 60, 300)
-syringe2_5 = Syringe(7.28366, 60, 60)
+syringe2_5 = Syringe(7.28366, 60, 120)
 syringe1 = Syringe(4.60659, 60, 30)
 syringe0_025 = Syringe(0.728366, 60, 10)
 
 #manually enter, which syringe is at which pump, e.g.:
 syringe_dict = {
-    "neM-LP_1_pump" : syringe1,
+    "neM-LP_1_pump" : syringe2_5,
     "neM-LP_2_pump" : syringe2_5,
     "neM-LP_3_pump" : syringe25,
     "neM-LP_4_pump" : syringe1,
@@ -35,28 +35,30 @@ syringe_dict = {
     "neM-LP_6_pump" : syringe2_5
 }
 
-#manually enter, which valves are set how
+# valve 1 lights up
+# valve 1 is 1
+# manually enter, which valves are set how
 qmix_valve_input = {
     "QmixV_1_valve" : 1,
-    "QmixV_2_valve" : 2,
-    "QmixV_3_valve" : 3,
+    "QmixV_2_valve" : 7,
+    "QmixV_3_valve" : 1,
     "QmixV_4_valve" : 4,
     "QmixV_5_valve" : 5,
     "QmixV_6_valve" : 6
 }
 neM_LP_valve_input = {
-    "neM-LP_1_valve" : 0,
-    "neM-LP_2_valve" : 0,
-    "neM-LP_3_valve" : 0,
+    "neM-LP_1_valve" : 1,
+    "neM-LP_2_valve" : 1,
+    "neM-LP_3_valve" : 1,
     "neM-LP_4_valve" : 1,
     "neM-LP_5_valve" : 1,
     "neM-LP_6_valve" : 1
 }
 
 qmix_valve_output = {
-    "QmixV_1_valve" : 9,
-    "QmixV_2_valve" : 8,
-    "QmixV_3_valve" : 7,
+    "QmixV_1_valve" : 1,
+    "QmixV_2_valve" : 7,
+    "QmixV_3_valve" : 2,
     "QmixV_4_valve" : 6,
     "QmixV_5_valve" : 5,
     "QmixV_6_valve" : 4
@@ -145,9 +147,10 @@ qmixbus.Bus.start()
 
 # Initialize and configure pumps
 for pump in Pumps.keys():
-    Pumps[pump].calibrate()
-    timer = qmixbus.PollingTimer(60000)
-    timer.wait_until(Pumps[pump].is_calibration_finished, True)
+    # TODO@warning_message
+    #Pumps[pump].calibrate()
+    #timer = qmixbus.PollingTimer(60000)
+    #timer.wait_until(Pumps[pump].is_calibration_finished, True)
     Pumps[pump].set_syringe_param(inner_diameter_mm=syringe_dict[pump].inner_diameter, max_piston_stroke_mm=syringe_dict[pump].piston_stroke)
     Pumps[pump].set_volume_unit(qmixpump.UnitPrefix.milli, qmixpump.VolumeUnit.litres)
     Pumps[pump].set_flow_unit(qmixpump.UnitPrefix.milli, qmixpump.VolumeUnit.litres, qmixpump.TimeUnit.per_second)
@@ -171,6 +174,7 @@ for valve_p in Valves_pumps.keys():
 
 '''----------------Preparation end----------------'''
 
+
 ###################ACTION CODE START##########################
 
 # create dict chemList including objects of class chemicals
@@ -185,41 +189,57 @@ chemList = chemicals.loadChemicalsList("chemList")
 # print(vol)
 
 # pumping a test volume, 100 %, 50 %, 25 % and 10 % of the possible volume of each syringe
-test_volume = [0.1, 0.25, 0.5, 1]
+test_volume = [1]
 
 
 for p in test_volume:
     # switch valves ready for filling the pump
-    print()
+    print("change valve position")
     for valve in qmix_valve_input.keys():
         Valves_Qmix[valve].switch_valve_to_position(qmix_valve_input[valve])
-        print(valve, " Position: ", Valves_Qmix[valve].actual_valve_position())
+        # print(valve, " Position: ", Valves_Qmix[valve].actual_valve_position())
     for valve in neM_LP_valve_input.keys():
         Valves_pumps[valve].switch_valve_to_position(neM_LP_valve_input[valve])
-        print(valve, " Position: ", Valves_pumps[valve].actual_valve_position())
+        # print(valve, " Position: ", Valves_pumps[valve].actual_valve_position())
 
 
     # start filling the pump
-    Pumps["neM-LP_1_pump"].aspirate(p*Pumps["neM-LP_1_pump"].get_volume_max(), Pumps["neM-LP_1_pump"].get_flow_rate_max())
+    # Pumps["neM-LP_1_pump"].aspirate(p*Pumps["neM-LP_1_pump"].get_volume_max(), 0.5*Pumps["neM-LP_1_pump"].get_flow_rate_max())
+    print("Start Pumping")
+    Pumps["neM-LP_1_pump"].aspirate(p*Pumps["neM-LP_1_pump"].get_volume_max(), 0.03)
+
     # wait until pump is full
+    timer = qmixbus.PollingTimer(60000)
     timer.wait_until(Pumps["neM-LP_1_pump"].is_pumping, False)
+    print("Set timer and wait for pump to finish")
     # abhängig von der Füllhöhe oder von maximal möglicher Füllung warten?
+    #print("time to wait till pump is full", syringe_dict["neM-LP_1_pump"].filled_wait_time)
     time.sleep(syringe_dict["neM-LP_1_pump"].filled_wait_time)
     print("\nFilling level of Pump 1:", Pumps["neM-LP_1_pump"].get_fill_level())
 
     # switch valves ready for emptying pump, available valves positions from 0 to 9
-    print()
+    print("Change valve position")
     for valve in qmix_valve_output.keys():
         Valves_Qmix[valve].switch_valve_to_position(qmix_valve_output[valve])
-        print(valve, " Position: ", Valves_Qmix[valve].actual_valve_position())
+        # print(valve, " Position: ", Valves_Qmix[valve].actual_valve_position())
     for valve in neM_LP_valve_output.keys():
         Valves_pumps[valve].switch_valve_to_position(neM_LP_valve_output[valve])
-        print(valve, " Position: ", Valves_pumps[valve].actual_valve_position())
+        # print(valve, " Position: ", Valves_pumps[valve].actual_valve_position())
 
     #start emptying the pump
-    Pumps["neM-LP_1_pump"].dispense(Pumps["neM-LP_1_pump"].get_fill_level(), Pumps["neM-LP_1_pump"].get_flow_rate_max())
+    print("dispense pump")
+    # Pumps["neM-LP_1_pump"].dispense(Pumps["neM-LP_1_pump"].get_fill_level(), 0.5*Pumps["neM-LP_1_pump"].get_flow_rate_max())
+    Pumps["neM-LP_1_pump"].dispense(Pumps["neM-LP_1_pump"].get_fill_level(), 0.03)
     timer.wait_until(Pumps["neM-LP_1_pump"].is_pumping, False)
+    #wait, until pump is empty
+    #print("time to wait for emptying the pump", p*Pumps["neM-LP_1_pump"].get_volume_max()/Pumps["neM-LP_1_pump"].get_flow_rate_max()+5)
+    #time.sleep(p*Pumps["neM-LP_1_pump"].get_volume_max()*Pumps["neM-LP_1_pump"].get_flow_rate_max()+5)
     print("\nFilling level of Pump 1:", Pumps["neM-LP_1_pump"].get_fill_level())
+
+    print("press any key to continue")
+    input()
+
+
 ###################ACTION CODE END##########################
 
 
