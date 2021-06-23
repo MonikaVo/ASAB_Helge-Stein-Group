@@ -6,21 +6,15 @@ from sklearn.linear_model import LinearRegression
 import math
 import pandas as pd
 
+# used parameters
 gyromagn_ratio = 2.675*10**8        # rad*T^(-1)*s^(-1)
 gradient_length = 0.004     # sec, D71
 diffusion_time = 0.025      # sec, D74
 maximum_gradient = 0.2977       # T*m^(-1)
 relative_gradient = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
-#columns = ["triplet", "quartet", "acide H", "H2O", "acide H + H2O"]
-columns = pd.read_csv("values.csv", header = None)
-#print(columns2.loc[0,1])
+
 # import values to evaluate
 values = pd.read_csv("values.csv", sep=",", header = None)
-
-# print(values)
-
-# print(values)
-# print(values.loc[1, "triplet"])
 
 
 def find_D(values):
@@ -32,21 +26,18 @@ def find_D(values):
     x = x.reshape((-1, 1))
     # print(x)
 
-    D = []
-    print(values)
+    D = []      # list in which diffusion coefficients will be entered
 
-    for i in range(6-1):
+    for i in range(len(values)-1):
 
         y_raw = []
         # calculate the values of the y-axis
-        for j in range(11):
+        for j in range(len(relative_gradient)+1):
             y_raw = y_raw + [float(values.loc[j+1, i])]
-        # print(y_raw)
-        y = []
 
+        y = []
         for j in range(len(y_raw)-1):
             y = y + [ln(y_raw[j+1]/y_raw[0])]
-        # print(y)
 
        # fit
         model = LinearRegression().fit(x, y)
@@ -54,11 +45,13 @@ def find_D(values):
         #print("intercept: ", model.intercept_)
         #print("slope: ", model.coef_[0])
 
-        D = D + [[columns.loc[0, i], -model.coef_[0]]]
+        D = D + [[values.loc[0, i], -model.coef_[0]]]
 
     return(D)
 
+# export results in .csv file
 D = find_D(values)
+print(D)
 data_frame = pd.DataFrame(D)
 data_frame.to_csv("diffusion_coefficient.csv")
 # pd.concat([values, data_frame]).to_csv("Values3.csv")
