@@ -15,6 +15,7 @@ relative_gradient = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
 # import values to evaluate
 values = pd.read_csv("values.csv", sep=",", header = None)
+print(values)
 
 
 def find_D(values):
@@ -28,7 +29,7 @@ def find_D(values):
 
     D = []      # list in which diffusion coefficients will be entered
 
-    for i in range(len(values)-1):
+    for i in range(len(values.columns)):
 
         y_raw = []
         # calculate the values of the y-axis
