@@ -54,5 +54,6 @@ def find_D(values):
 D = find_D(values)
 print(D)
 data_frame = pd.DataFrame(D)
+data_frame.columns = ['Measurement', 'Diffusion Coefficient']
 data_frame.to_csv("diffusion_coefficient.csv")
 # pd.concat([values, data_frame]).to_csv("Values3.csv")
