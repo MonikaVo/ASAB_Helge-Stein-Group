@@ -4,76 +4,83 @@ sys.path.append(r".../QmixSDK/lib/python")  # edited prior to publication
 from experiment import calcComp, chemicals
 # import qmix modules
 from qmixsdk import qmixbus, qmixpump, qmixvalve, qmixcontroller
+from qmixsdk.qmixpump import ContiFlowProperty, ContiFlowPump, ContiFlowSwitchingMode
+
 
 # import other modules
 import time
-# import calcComp
-# import chemicals
-# import testCalcComp
 import pandas as pd
 
 '''----------------create Syringe-Dict begin---------------'''
 
+# define a class, where paramteres of each syringe are saved
 class Syringe:
-    def __init__(self, inner_diameter, piston_stroke, filled_wait_time):
+    def __init__(self, inner_diameter, piston_stroke, filled_wait_time, flow_rate):
         self.inner_diameter = inner_diameter     # in mm
         self.piston_stroke = piston_stroke       # in mm
         self.filled_wait_time = filled_wait_time        # in s
+        self.flow_rate = flow_rate      # in mL per s
 
 #define each available syringe
-syringe25 = Syringe(23.0329, 60, 300)
-syringe2_5 = Syringe(7.28366, 60, 120)
-syringe1 = Syringe(4.60659, 60, 30)
-syringe0_025 = Syringe(0.728366, 60, 10)
+syringe25 = Syringe(23.0329, 60, 300, 0.2)      # max flow_rate = 1.247 mL/s
+syringe2_5 = Syringe(7.28366, 60, 120, 0.04)        # max flow_rate = 0.1247 mL/s
+syringe1 = Syringe(4.60659, 60, 300, 0.01)      # max flow_rate = 0.0499 mL/s
+syringe0_025 = Syringe(0.728366, 60, 10, 0.0005)        # max flow_rate = 0.001247 mL/s
 
-#manually enter, which syringe is at which pump, e.g.:
+#manually enter, which syringe is at which pump:
 syringe_dict = {
-    "neM-LP_1_pump" : syringe1,
+    "neM-LP_1_pump" : syringe2_5,
     "neM-LP_2_pump" : syringe2_5,
-    "neM-LP_3_pump" : syringe25,
+    "neM-LP_3_pump" : syringe2_5,
     "neM-LP_4_pump" : syringe1,
     "neM-LP_5_pump" : syringe0_025,
     "neM-LP_6_pump" : syringe2_5
 }
 
-flow_rate = 0.03
+# valve 1 lights up, valve 0 not
+# manually enter, which valves are set how (qmix: 0-9; NeM: 0-1) when which process is done
+qmix_valve_dispense = {
+    "QmixV_3_valve": 2,
+}
 
-# valve 1 lights up
-# valve 1 is 1
-# manually enter, which valves are set how (qmix: 0-9; NeM: 0-1)
-qmix_valve_input = {
-    "QmixV_1_valve" : 0,
-    "QmixV_2_valve" : 6,
+neM_LP_valve_dispense = {
+    "neM-LP_1_valve" : 1,
+}
+
+qmix_valve_aspirate_first_component = {
     "QmixV_3_valve" : 0,
-    "QmixV_4_valve" : 4,
-    "QmixV_5_valve" : 5,
-    "QmixV_6_valve" : 6
 }
-neM_LP_valve_input = {
+neM_LP_valve_aspirate_first_component = {
     "neM-LP_1_valve" : 1,
-    "neM-LP_2_valve" : 1,
-    "neM-LP_3_valve" : 1,
-    "neM-LP_4_valve" : 1,
-    "neM-LP_5_valve" : 1,
-    "neM-LP_6_valve" : 1
 }
 
-qmix_valve_output = {
-    "QmixV_1_valve" : 0,
-    "QmixV_2_valve" : 6,
-    "QmixV_3_valve" : 1,
-    "QmixV_4_valve" : 6,
-    "QmixV_5_valve" : 5,
-    "QmixV_6_valve" : 4
-}
-neM_LP_valve_output = {
-    "neM-LP_1_valve" : 1,
+neM_LP_valve_first_to_second_syringe = {
+    "neM-LP_1_valve" : 0,
     "neM-LP_2_valve" : 1,
-    "neM-LP_3_valve" : 1,
-    "neM-LP_4_valve" : 0,
-    "neM-LP_5_valve" : 0,
-    "neM-LP_6_valve" : 0
 }
+
+qmix_valve_aspirate_second_component = {
+    "QmixV_3_valve" : 1,
+}
+neM_LP_valve_aspirate_second_component = {
+    "neM-LP_1_valve" : 1,
+}
+
+neM_LP_valve_from_syringe1_to_glass = {
+    "neM-LP_1_valve" : 0,
+}
+
+neM_LP_valve_aspirate_into_syringe2 = {
+    "neM-LP_2_valve" : 1,
+}
+
+neM_LP_valve_second_to_third_syringe = {
+    "neM-LP_2_valve": 0,
+    "neM-LP_3_valve": 1,
+}
+
+qmix_valve_aspirate_components = [qmix_valve_aspirate_first_component, qmix_valve_aspirate_second_component]
+neM_valve_aspirate_components = [neM_LP_valve_aspirate_first_component, neM_LP_valve_aspirate_second_component]
 
 '''----------------create Syringe-Dict end---------------'''
 
@@ -150,7 +157,6 @@ qmixbus.Bus.start()
 
 # Initialize and configure pumps
 for pump in Pumps.keys():
-    # TODO@warning_message
     # print("Now a calibration move is done. All syringes have to be removed. Confirm with any key")
     # input()
     # Pumps[pump].calibrate()
@@ -177,34 +183,22 @@ for valve_p in Valves_pumps.keys():
     Valves_pumps[valve_p].switch_valve_to_position(0)
     # print("{} at position {} of {} positions".format(valve_p, Valves_pumps[valve_p].actual_valve_position(), Valves_pumps[valve_p].number_of_valve_positions()))
 
-# Initialize ContiFlowPump (two pumps virtually connected)
-pump_1to2 = ContiFlowPump()
-pump_1to2.create(Pumps["neM-LP_1_pump"], Pumps["neM-LP_2_pump"])
-pump_1to2.configure_contiflow_valve(0, 0, Valves_pumps["neM-LP_1_valve"], 0, 0, -1)
-pump_1to2.configure_contiflow_valve(1, 0, Valves_pumps["neM-LP_2_valve"], 0, 0, -1)
-print("Syringe Pump of Pump Channel 0: ", pump_1to2.get_syringe_pump(0))
-print("Syringe Pump of Pump Channel 1: ", pump_1to2.get_syringe_pump(1))
-print("parameter of Syringe Pump Channel 0: inner diameter, max piston stroke: ", pump_1to2.get_syringe_param())
-print("parameter of Syringe Pump Channel 1: inner diameter, max piston stroke: ", pump_1to2.get_syringe_param())
+#  method for pumping liquid from one syringe to another
+def pump_to_other(pump1, pump2, volume, flow_rate):
+    # aspirate pump 2
+    pump2.pump_volume(-volume, flow_rate)
+    # dispense pump 1
+    pump1.pump_volume(volume, flow_rate)
+    # wait till pumps stopped pumping
+    timer.wait_until(pump2.is_pumping and pump1.is_pumping, False)
 
-pump_1to2.set_device_property(ContiFlowProperty.SWITCHING_MODE,ContiFlowSwitchingMode.CROSS_FLOW)
-max_refill_flow = pump_1to2.get_device_property(ContiFlowProperty.MAX_REFILL_FLOW)
-pump_1to2.set_device_property(ContiFlowProperty.REFILL_FLOW, max_refill_flow / 2.0)
-pump_1to2.set_device_property(ContiFlowProperty.CROSSFLOW_DURATION_S, crossflow_seconds)
-pump_1to2.set_device_property(ContiFlowProperty.OVERLAP_DURATION_S, 0)
-max_conti_flow = pump_1to2.get_flow_rate_max()
-print("Max. pumpt_1to2 flow rate: ", max_conti_flow)
+# determine the maximum flow rate when pumping between two pumps
+# maximum flow rate is the flow rate of the syringe with the smallest flow rate
+pump_1to2_flow_rate = min(Pumps["neM-LP_1_pump"].get_flow_rate_max(), Pumps["neM-LP_2_pump"].get_flow_rate_max())
+print("pump_1to2_flow_rate: ", pump_1to2_flow_rate)
 
-# clear all device errors and set device into enabled state
-pump_1to2.clear_fault()
-pump_1to2.enable(True)
-
-# initialize contiflow
-# ignored, since reference move would be done
-
-flow_rate = min(Pumps["neM-LP_1_pump"], Pumps["neM-LP_2_pump"])
-
-
+pump_2to3_flow_rate = min(Pumps["neM-LP_2_pump"].get_flow_rate_max(), Pumps["neM-LP_3_pump"].get_flow_rate_max())
+print("pump_2to3_flow_rate: ", pump_1to2_flow_rate)
 
 '''----------------Preparation end----------------'''
 
@@ -218,66 +212,137 @@ flow_rate = min(Pumps["neM-LP_1_pump"], Pumps["neM-LP_2_pump"])
 # load chemList
 chemList = chemicals.loadChemicalsList("chemList")
 # Define mixture
-# mixratio = list(input("define mixratio: "))     # enter mixratio as e.g. 0.5, 0.5
-# components = list(input("define components: "))     # enter components as e.g. water, ethanol
-# amount = input("define total amount of mixture: ")
-# vol = calcComp.calcComp(chemList, mixratio, components, amount)
-# print(vol)
+components = ['H2O', 'EtOH']        # enter components as list
+deadVolume = [0.0989, 0.0996]      # enter deadVolume of each component which has to be aspirated and disposed
+lostVolume = 0.0531     # Volume which is lost of last component between syringe 1 and glass
+waitingtime = [60, 180]      # enter waiting time per component for full syringe in seconds
+mixratio = [0.9, 0.1]       # enter mixratio as list
+print("components: ", components)
+amount = 6        # enter total amount of mixture in mL
+vol = calcComp.calcComp(chemList, mixratio, components, amount)     # vol is list containing needed volumes of all components
+print("volume of each component: ", vol)
+# add lost volume only to last component, otherwise the component will be flushed into the glass by the next one
+for i in range(len(vol)):
+    if i == len(vol)-1:
+        vol[i] = vol[i] + lostVolume
+print("volume of each component incl. deadVolume: ", vol)
 
+input("confirm start of pumping: ")
+timer = qmixbus.PollingTimer(600000)        # initialize timer
 
-# switch valves ready for filling the pump
-print("change valve position for aspirating")
-for valve in qmix_valve_input.keys():
-    Valves_Qmix[valve].switch_valve_to_position(qmix_valve_input[valve])
-    # print(valve, " Position: ", Valves_Qmix[valve].actual_valve_position())
-for valve in neM_LP_valve_input.keys():
-    Valves_pumps[valve].switch_valve_to_position(neM_LP_valve_input[valve])
-    # print(valve, " Position: ", Valves_pumps[valve].actual_valve_position())
+# solution is mixed in glass using syringe 1 containing 2.5 mL at maximum
+def mix_in_glass_via_syringe1():
+    for i in range(len(components)):
+        timer = qmixbus.PollingTimer(600000)
+        for j in range(2):
+            # fill pump with deadVolume * 150 % and dispense ist completely
+            for valve in qmix_valve_aspirate_components[i].keys():
+                Valves_Qmix[valve].switch_valve_to_position(qmix_valve_aspirate_components[i][valve])
+            for valve in neM_valve_aspirate_components[i].keys():
+                Valves_pumps[valve].switch_valve_to_position(neM_valve_aspirate_components[i][valve])
 
-# start filling the pump
-# Pumps["neM-LP_1_pump"].aspirate(p*Pumps["neM-LP_1_pump"].get_volume_max(), 0.5*Pumps["neM-LP_1_pump"].get_flow_rate_max())
-print("ready to start pumping? Press any key to continue")
-input()
-print("Start Pumping")
-Pumps["neM-LP_1_pump"].aspirate(test_volume[i]*Pumps["neM-LP_1_pump"].get_volume_max(), flow_rate)
+            Pumps["neM-LP_1_pump"].aspirate(deadVolume[i]*1.5, syringe_dict['neM-LP_1_pump'].flow_rate)
+            # wait until pump is full
+            timer.wait_until(Pumps["neM-LP_1_pump"].is_pumping, False)
 
-# wait until pump is full
-timer = qmixbus.PollingTimer(600000)
-timer.wait_until(Pumps["neM-LP_1_pump"].is_pumping, False)
-print("finished pumping, wait for pump to get filled")
-# abhängig von der Füllhöhe oder von maximal möglicher Füllung warten?
-# time.sleep(syringe_dict["neM-LP_1_pump"].filled_wait_time)
-print("\nFilling level of Pump 1:", Pumps["neM-LP_1_pump"].get_fill_level())
-print("confirm the pump is full and can be dispensed")
-input()
+            time.sleep(15)      # wait unitl pump is full
 
-# switch valves for pumping syringe 1 to 2
+            for valve in qmix_valve_dispense.keys():
+                Valves_Qmix[valve].switch_valve_to_position(qmix_valve_dispense[valve])
+            for valve in neM_LP_valve_dispense.keys():
+                Valves_pumps[valve].switch_valve_to_position(neM_LP_valve_dispense[valve])
 
-# pump syringe 1 to 2
-pump_1to2.set_fill_level(0, flow_rate)
+            Pumps["neM-LP_1_pump"].dispense(Pumps["neM-LP_1_pump"].get_fill_level(), syringe_dict['neM-LP_1_pump'].flow_rate)
+            # wait until pump empty
+            timer.wait_until(Pumps["neM-LP_1_pump"].is_pumping, False)
+            print("Dead Volume of ", components[i], " is disposed")
 
-# switch valves ready for emptying pump
-print("change valve position for dispensing")
-for valve in qmix_valve_output.keys():
-    Valves_Qmix[valve].switch_valve_to_position(qmix_valve_output[valve])
-    # print(valve, " Position: ", Valves_Qmix[valve].actual_valve_position())
-for valve in neM_LP_valve_output.keys():
-    Valves_pumps[valve].switch_valve_to_position(neM_LP_valve_output[valve])
-    # print(valve, " Position: ", Valves_pumps[valve].actual_valve_position())
+        # start filling the pump with each component
+        print("\nStart aspirating ", components[i], " into first syringe")
+        restvolume = vol[i]
+        # if pumped volume is larger than the syringe can contain, it has to be pumped several times
+        while restvolume > Pumps["neM-LP_1_pump"].get_volume_max():
+            print("syringe has to be filled several times")
+            # switch valves ready for aspirating component into first syringe
+            print("change valve position for aspirating ", components[i])
+            for valve in qmix_valve_aspirate_components[i].keys():
+                Valves_Qmix[valve].switch_valve_to_position(qmix_valve_aspirate_components[i][valve])
+            for valve in neM_valve_aspirate_components[i].keys():
+                Valves_pumps[valve].switch_valve_to_position(neM_valve_aspirate_components[i][valve])
+            restvolume = restvolume - Pumps["neM-LP_1_pump"].get_volume_max()       # restvolume is volume which is still left to be pumped
+            Pumps["neM-LP_1_pump"].aspirate(Pumps["neM-LP_1_pump"].get_volume_max(), syringe_dict['neM-LP_1_pump'].flow_rate*0.5)
+            # wait until pump is full
+            timer.wait_until(Pumps["neM-LP_1_pump"].is_pumping, False)
+            print("wait for the pump to be full, then next step is done: ")
+            time.sleep(waitingtime[i])
 
-#start emptying the pump
-print("dispense pump")
-# Pumps["neM-LP_1_pump"].dispense(Pumps["neM-LP_1_pump"].get_fill_level(), 0.5*Pumps["neM-LP_1_pump"].get_flow_rate_max())
-Pumps["neM-LP_1_pump"].dispense(Pumps["neM-LP_1_pump"].get_fill_level(), flow_rate)
-timer.wait_until(Pumps["neM-LP_1_pump"].is_pumping, False)
-#wait, until pump is empty
-#print("time to wait for emptying the pump", p*Pumps["neM-LP_1_pump"].get_volume_max()/Pumps["neM-LP_1_pump"].get_flow_rate_max()+5)
-#time.sleep(p*Pumps["neM-LP_1_pump"].get_volume_max()*Pumps["neM-LP_1_pump"].get_flow_rate_max()+5)
-print("\nFilling level of Pump 1:", Pumps["neM-LP_1_pump"].get_fill_level())
+            # switch valves for pumping from syringe 1 to glass
+            print("\nswitch valves for pumping from syringe 1 to get solution ")
+            for valve in neM_LP_valve_from_syringe1_to_glass.keys():
+                Valves_pumps[valve].switch_valve_to_position(neM_LP_valve_from_syringe1_to_glass[valve])
 
+            # start pumping component from syringe 1 to glass to collect component
+            Pumps["neM-LP_1_pump"].dispense(Pumps["neM-LP_1_pump"].get_fill_level(), syringe_dict['neM-LP_1_pump'].flow_rate)
+            timer.wait_until(Pumps["neM-LP_1_pump"].is_pumping, False)
 
+        #switch valves ready for aspirating component into first syringe
+        print("change valve position for aspirating ", components[i])
+        for valve in qmix_valve_aspirate_components[i].keys():
+            Valves_Qmix[valve].switch_valve_to_position(qmix_valve_aspirate_components[i][valve])
+        for valve in neM_valve_aspirate_components[i].keys():
+            Valves_pumps[valve].switch_valve_to_position(neM_valve_aspirate_components[i][valve])
 
+        Pumps["neM-LP_1_pump"].aspirate(restvolume, syringe_dict['neM-LP_1_pump'].flow_rate*0.5)
+        # wait until pump is full
+        timer.wait_until(Pumps["neM-LP_1_pump"].is_pumping, False)
+        print("Filling level of Pump 1:", Pumps["neM-LP_1_pump"].get_fill_level())
+        print("wait for the pump to be full, then next step is done: ")
+        time.sleep(waitingtime[i])
 
+        # switch valves for pumping from syringe 1 to glass
+        print("\nswitch valves for pumping from syringe 1 to get solution ")
+        for valve in neM_LP_valve_from_syringe1_to_glass.keys():
+            Valves_pumps[valve].switch_valve_to_position(neM_LP_valve_from_syringe1_to_glass[valve])
+
+        # start pumping component from syringe 1 to glass to collect component
+        Pumps["neM-LP_1_pump"].dispense(Pumps["neM-LP_1_pump"].get_fill_level(), syringe_dict['neM-LP_1_pump'].flow_rate)
+        timer.wait_until(Pumps["neM-LP_1_pump"].is_pumping, False)
+
+        print(components[i], " is in glass")
+        print("Filling level of Pump 1:", Pumps["neM-LP_1_pump"].get_fill_level())
+
+def pump_through_NMR():
+    # switch vales to aspirate solution into syringe 2:
+    for valve in neM_LP_valve_aspirate_into_syringe2.keys():
+        Valves_pumps[valve].switch_valve_to_position(neM_LP_valve_aspirate_into_syringe2[valve])
+    # start to aspirate
+    Pumps["neM-LP_2_pump"].aspirate(2, syringe_dict['neM-LP_2_pump'].flow_rate*0.5)
+    # wait until pump is full
+    timer.wait_until(Pumps["neM-LP_2_pump"].is_pumping, False)
+    print("wait for the pump to be full, then next step is done: ")
+    time.sleep(180)
+
+    # switch valves for pumping 1 mL to the nmr
+    print("\nswitch valves to pump from syringe 2 via nmr to syringe 3")
+    for valve in neM_LP_valve_second_to_third_syringe.keys():
+        Valves_pumps[valve].switch_valve_to_position(neM_LP_valve_second_to_third_syringe[valve])
+
+    # pump mixture to nmr
+    print("mixture is pumped via nmr to syringe 3: ")
+    pump_to_other(Pumps["neM-LP_2_pump"], Pumps["neM-LP_3_pump"], Pumps["neM-LP_2_pump"].get_fill_level(), pump_2to3_flow_rate*0.2)
+
+    # dispose mixed solution of this and last measurement
+    input("dispose solution: ")
+    Valves_pumps["neM-LP_3_valve"].switch_valve_to_position(0)
+    Pumps["neM-LP_3_pump"].dispense(Pumps["neM-LP_3_pump"].get_fill_level(), syringe_dict['neM-LP_3_pump'].flow_rate)
+    # wait until pump is full
+    timer.wait_until(Pumps["neM-LP_3_pump"].is_pumping, False)
+
+    # wait for measurement
+    print("ready for measurement")
+
+mix_in_glass_via_syringe1()
+#pump_through_NMR()
 
 ###################ACTION CODE END##########################
 
