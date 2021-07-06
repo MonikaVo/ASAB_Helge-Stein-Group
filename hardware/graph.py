@@ -3,18 +3,21 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import pickle
 
-# TODO: make graph a directed graph
-# TODO: Remove this after definintion of helper function!!!
+#TODO: Remove this after definintion of helper function!!!
 def SaveToFile(filename, data):
     with open(filename, 'wb') as out_file:
         pickle.dump(data, out_file) # https://stackoverflow.com/questions/20101021/how-to-close-the-file-after-pickle-load-in-python
 
-# # Define the paths to the files nodes.csv, edges.csv and current tubing.csv valid for the configuration
-# nodes_path = "hardware/nodes.csv"
-# edges_path = "hardware/edges.csv"
-# tubing_path = "hardware/tubing.csv"
+def appendEdge(edgelst, edge_name, edgeNodes, edgeProps, reverse=False):
+    edgelst.append((edgeNodes.loc[edgeNodes["edge"] == edge_name, "start"].values[0], edgeNodes.loc[edgeNodes["edge"] == edge_name, "end"].values[0],
+            {"name": edge_name, "ends": edgeProps.loc[edgeProps["edge"] == edge_name, "ends"].values[0], "length": float(edgeProps.loc[edgeProps["edge"] == edge_name, "length"].values[0]),
+            "diameter": float(edgeProps.loc[edgeProps["edge"] == edge_name, "diameter"].values[0]), "dead_volume": float(edgeProps.loc[edgeProps["edge"] == edge_name, "dead_volume"].values[0])}))
+    if reverse == True:
+        edgelst.append((edgeNodes.loc[edgeNodes["edge"] == edge_name, "end"].values[0], edgeNodes.loc[edgeNodes["edge"] == edge_name, "start"].values[0],
+            {"name": edge_name, "ends": edgeProps.loc[edgeProps["edge"] == edge_name, "ends"].values[0], "length": float(edgeProps.loc[edgeProps["edge"] == edge_name, "length"].values[0]),
+            "diameter": float(edgeProps.loc[edgeProps["edge"] == edge_name, "diameter"].values[0]), "dead_volume": float(edgeProps.loc[edgeProps["edge"] == edge_name, "dead_volume"].values[0])}))
 
-def generateGraph(graph_name="setup", path_nodes="hardware/nodes.csv", path_edges="hardware/edges.csv", path_tubing="hardware/tubing.csv", show=True, save=True, save_path="hardware/graph.pck"):
+def generateGraph(path_nodes="hardware/nodes.csv", path_edges="hardware/edges.csv", path_tubing="hardware/tubing.csv", show=True, save=True, save_path="hardware/setup.pck"):
     # Load the information regarding the nodes from nodes.csv to nodes_info.
     nodes_info = pd.read_csv(path_nodes, sep=";")
     # Load the information regarding the edges from edges.csv to nodes_info.
@@ -34,38 +37,26 @@ def generateGraph(graph_name="setup", path_nodes="hardware/nodes.csv", path_edge
     edges = []
     # Go through all the fixed edges in edges.csv and the edges contained in tubing.csv in order to generate the required dictionary containing the edges and their properties.
     for edge in edges_info.loc[edges_info["status"] == "fixed", "edge"]:
-        edges.append((edges_info.loc[edges_info["edge"] == edge, "start_fixed"].values[0], edges_info.loc[edges_info["edge"] == edge, "end_fixed"].values[0],
-        {"name": edge, "ends": edges_info.loc[edges_info["edge"] == edge, "ends"].values[0], "length": float(edges_info.loc[edges_info["edge"] == edge, "length"].values[0]),
-        "diameter": float(edges_info.loc[edges_info["edge"] == edge, "diameter"].values[0]), "dead_volume": float(edges_info.loc[edges_info["edge"] == edge, "dead_volume"].values[0])}))
-        # Add the second direction of the edge, if the edge is undirected.
-        if edges_info.loc[edges_info["edge"] == edge, "restriction"].values[0] == "undirected":
-            edges.append((edges_info.loc[edges_info["edge"] == edge, "end_fixed"].values[0], edges_info.loc[edges_info["edge"] == edge, "start_fixed"].values[0],
-            {"name": edge, "ends": edges_info.loc[edges_info["edge"] == edge, "ends"].values[0], "length": float(edges_info.loc[edges_info["edge"] == edge, "length"].values[0]),
-            "diameter": float(edges_info.loc[edges_info["edge"] == edge, "diameter"].values[0]), "dead_volume": float(edges_info.loc[edges_info["edge"] == edge, "dead_volume"].values[0])}))
+        appendEdge(edges, edge, edges_info, edges_info, reverse=(edges_info.loc[edges_info["edge"] == edge, "restriction"].values[0] == "undirected"))
     for edge in tubing_config["edge"]:
-        edges.append((tubing_config.loc[tubing_config["edge"] == edge, "start_node"].values[0], tubing_config.loc[tubing_config["edge"] == edge, "end_node"].values[0],
-        {"name": edge, "ends": edges_info.loc[edges_info["edge"] == edge, "ends"].values[0], "length": float(edges_info.loc[edges_info["edge"] == edge, "length"].values[0]),
-        "diameter": float(edges_info.loc[edges_info["edge"] == edge, "diameter"].values[0]), "dead_volume": float(edges_info.loc[edges_info["edge"] == edge, "dead_volume"].values[0])}))
-        # Add the second direction of the edge, if the edge is undirected.
-        if edges_info.loc[edges_info["edge"] == edge, "restriction"].values[0] == "undirected":
-            edges.append((tubing_config.loc[tubing_config["edge"] == edge, "end_node"].values[0], tubing_config.loc[tubing_config["edge"] == edge, "start_node"].values[0],
-            {"name": edge, "ends": edges_info.loc[edges_info["edge"] == edge, "ends"].values[0], "length": float(edges_info.loc[edges_info["edge"] == edge, "length"].values[0]),
-            "diameter": float(edges_info.loc[edges_info["edge"] == edge, "diameter"].values[0]), "dead_volume": float(edges_info.loc[edges_info["edge"] == edge, "dead_volume"].values[0])}))
-
-    # Generate a graph named graph_name based on the data contained in tubing_info.
-    graph_name = nx.DiGraph()
-    graph_name.add_nodes_from(nodes)
-    graph_name.add_edges_from(edges)
+        appendEdge(edges, edge, tubing_config, edges_info, reverse=(edges_info.loc[edges_info["edge"] == edge, "restriction"].values[0] == "undirected"))
+     
+    # Generate a graph named graph based on the data contained in tubing_info.
+    graph = nx.DiGraph()
+    graph.add_nodes_from(nodes)
+    graph.add_edges_from(edges)
 
     if show==True:
-        drawGraph(graph_name, positions, wlabels=True)
+        drawGraph(graph, positions, wlabels=True)
 
     # If the parameter is set accordingly, save the graph to a pickle file. Else return the graph.
     if save==True:
         # TODO: Generate helper functions file and import it in order to save the graph as a pickle file.
-        SaveToFile(save_path, graph_name)
+        SaveToFile(save_path, graph)
+        return graph
     elif save==False:
-        return graph_name
+        return graph
+   
 
 def drawGraph(graph, positions, wlabels=True):
     ''' This function draws and shows a graph. '''
@@ -90,44 +81,50 @@ def getTotalQuantity(edgedict, quantity):
     return deadVolTotal
 
 def getValveSettings(nodelist):
-    ''' Based on a list of nodes describing a path in the graph, this function returns the required settings of the valves needed to realise this path. '''
+    ''' Based on a list of nodes describing a path in the graph, this function returns the required settings of the valves needed to realise
+    this path, in case there are valves included in the path. Otherwise, an empty list will be returned. '''
     valveSettings = {}
     for node in nodelist:
-        print("node", str(node), node[0:2])
         valve = node[0:2]
         if valve in valvePositionDict.keys():
-            print("valve", valve)
-            print(node[-1])
             if node[-1] != str(0):
                 valveSettings[valve] = valvePositionDict[valve][node]
             elif node[-1] == str(0):
-                print("node_here", node)
                 pass
             elif valve in valveSettings.keys() and node[-1] != str(0):
                 print("This path is not valid, because it passes the same valve multiple times.")
     return valveSettings
 
-valvePositionDict = {}
-for j in range(1,7):
-    valvePositionDict["V{}".format(j)] = {}
-    for i in range(0,11):
-        key = "V{}.{}".format(j,i)
-        valvePositionDict["V{}".format(j)][key] = i-1 if i != 0 else None
-for p in ["Av", "Bv", "Cv", "Dv", "Ev", "Fv"]:
-    valvePositionDict["{}".format(p)] = {}
-    for z in [1,2]:
-        key2 = "{}{}".format(p,z)
-        valvePositionDict[p][key2] = 0 if z==1 else 1
-print(valvePositionDict)
+def loadGraph(graphFile=r"hardware/setup.pck"):
+    # TODO: Define helper functions and include it here
+    with open(graphFile, 'rb') as load_file:
+        out = pickle.load(load_file)
+    return out
+
+
+# Definiton of valvePositionDict correlating the valve position taken by the Cetoni API to the label of the respective node in the graph.
+def generate_valvePositionDict():
+    valvePositionDict = {}
+    for j in range(1,7):
+        valvePositionDict["V{}".format(j)] = {}
+        for i in range(0,11):
+            key = "V{}.{}".format(j,i)
+            valvePositionDict["V{}".format(j)][key] = i-1 if i != 0 else None
+    for p in ["Av", "Bv", "Cv", "Dv", "Ev", "Fv"]:
+        valvePositionDict["{}".format(p)] = {}
+        for z in [1,2]:
+            key2 = "{}{}".format(p,z)
+            valvePositionDict[p][key2] = 0 if z==1 else 1
+    SaveToFile(r"hardware/valvePositionDict.pck", valvePositionDict)
 
 
 
-setup = generateGraph(show=True, save=False)
-#myPath = getEdgedictFromNodelist(setup, nx.dijkstra_path(setup, "A0.0", "Reservoir2", "dead_volume"))   # https://networkx.org/documentation/stable/reference/algorithms/shortest_paths.html
+# setup1 = generateGraph1(show=True, save=True)#loadGraph()
+# setup2 = loadGraph()#generateGraph2(show=True, save=True)
+# print(setup1.number_of_edges())
+# print(setup2.number_of_edges())
 
-print(nx.dijkstra_path(setup, "A0.0", "Reservoir1", "dead_volume"))
-print(getValveSettings(nx.dijkstra_path(setup, "A0.0", "Reservoir1", "dead_volume")))
-
-
-# TODO: dict with valve settings qmix_valve
-# TODO: Add function to load a graph
+# print(nx.dijkstra_path(setup1, "A0.0", "Reservoir1", "dead_volume"))
+# print(nx.dijkstra_path(setup2, "A0.0", "Reservoir1", "dead_volume"))
+# print(getValveSettings(nx.dijkstra_path(setup1, "A0.0", "Reservoir1", "dead_volume")))
+# print(getValveSettings(nx.dijkstra_path(setup2, "A0.0", "Reservoir1", "dead_volume")))
