@@ -1,0 +1,10 @@
+{
+    "paths": {
+    "ASAB": "../ASAB",
+    "QmixSDK_python": ".../QmixSDK/lib/python",
+    "QmixSDK": ".../QmixSDK",
+    "HardwareConfig": ".../ASAB_Config1_sim"
+
+    }
+
+}

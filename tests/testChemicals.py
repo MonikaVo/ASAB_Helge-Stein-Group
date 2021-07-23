@@ -7,8 +7,6 @@ sys.path.append(r"../experiment")
 sys.path.append(r"..")
 from experiment import chemicals
 from testfixtures import compare
-import pickle
-
 
 class testChemicals(): # https://data-flair.training/blogs/python-unittest/
     # # Test SaveToFile

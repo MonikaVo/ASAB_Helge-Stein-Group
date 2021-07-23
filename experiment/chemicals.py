@@ -6,13 +6,9 @@ import pickle
 import sys
 sys.path.append(r"../tests")
 sys.path.append(r"../experiment")
+from helpers import SaveToFile, LoadFile
 
-# Supporting functions
-def SaveToFile(filename, data):
-    with open(filename, 'wb') as out_file:
-        pickle.dump(data, out_file) # https://stackoverflow.com/questions/20101021/how-to-close-the-file-after-pickle-load-in-python
-    
-class chemical():
+class chemical:
     ''' This class defines chemicals in a way to determine the required volume in order to achieve a certain mixing ratio and to evaluate their compatibility with the ASAB setup. '''
 
     def __init__(self, nameShort, nameLong, density, molarMass):
@@ -68,9 +64,5 @@ def getChemicalsList(dataFile):         #input: .csv-file, output: dict
 
 def loadChemicalsList(file_chemList):   #input: path to pickle file
     ''' This function loads a saved chemList object. '''
-    print(os.getcwd())
-    with open(file_chemList, 'rb') as load_file:
-        print(os.getcwd())
-        out = pickle.load(load_file)
-        print(os.getcwd())
+    out = LoadFile(file_chemList)
     return out

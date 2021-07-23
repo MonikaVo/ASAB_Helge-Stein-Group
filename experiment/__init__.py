@@ -1,3 +1,3 @@
-from . import *
+import sys
 
-#__all__ = ["chemicals", "calcComp"]
+sys.path.append(r"../experiment")
