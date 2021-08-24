@@ -1,3 +1,3 @@
 import sys
 
-sys.path.append(r"../tests")
+sys.path.append(r"tests")

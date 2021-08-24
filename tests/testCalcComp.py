@@ -6,7 +6,6 @@ import unittest
 import numpy as np
 
 # generate chemList, when chemList already exist, then load chemList
-#chemList = chemicals.getChemicalsList("..\\experiment\\Chemicals_database.csv")
 chemList = chemicals.loadChemicalsList("chemList")
 
 print(chemList)

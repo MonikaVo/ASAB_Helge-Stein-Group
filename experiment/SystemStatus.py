@@ -8,14 +8,6 @@ import networkx as nx
 import numpy as np
 from qmixsdk import qmixvalve, qmixpump, qmixbus
 
-# ### Workaround helpers issue
-# def LoadFile(loadFile):
-#     ''' This function loads an object from a pickle file from the path stated as loadFile. '''
-#     with open(loadFile, 'rb') as load_file:
-#         out = pickle.load(load_file)
-#     return out
-# ###
-
 
 ''' This file needs to be called AFTER initialization of the ASAB hardware and start of the BUS communication. '''
 
@@ -49,10 +41,6 @@ def flush(pathToFlush, cleaningAgent, waste, setup_path=r"hardware/setup.pck", m
         # Check, if pathToFlush_processed includes the node, where the cleaing agent is available. If this is not the case, find a path, that does.
         if cleaningAgent not in pathToFlush_processed:
             # Find the nearest free pump from cleaningAgent, for which the path has the least dead volume
-            #pumps_candidtates = []
-            #for pump in Pumps.keys():
-                #if status[pump]=="empty":
-                    # pumps_candidtates.append(pump)
             pumpCleaning, path_CAToPumpCleaning = graph.findClosest(graph_setup, cleaningAgent, Pumps.keys(), "dead_volume", "out")
             
             # Find the nearest free pump from waste, for which the path has the least dead volume, and which is not the pump chosen for the cleaning agent
@@ -146,7 +134,5 @@ def update():
 
 # TODO: Check operability of flush routine.
 
-#"C:\Users\MonikaVogler\Desktop\ASAB_Config1_sim"
-#"W:\QmixSDK"
 Pumps, Valves = CetoniDevice.prepareCetoni(r"...\ASAB_Config1_sim", r"...\QmixSDK")  # edited prior to publication
 flush(['A0.0', 'A0.1', 'Av1', 'V1.1', 'V1.0', 'V2.0', 'V2.7', 'V3.0', 'V3.1', 'Reservoir1'], "Reservoir2", "Reservoir3", mode="liquid")

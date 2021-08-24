@@ -235,7 +235,7 @@ def mix_in_glass_via_syringe1():
     for i in range(len(components)):
         timer = qmixbus.PollingTimer(600000)
         for j in range(2):
-            # fill pump with deadVolume * 150 % and dispense ist completely
+            # fill pump with deadVolume * 150 % and dispense it completely
             for valve in qmix_valve_aspirate_components[i].keys():
                 Valves_Qmix[valve].switch_valve_to_position(qmix_valve_aspirate_components[i][valve])
             for valve in neM_valve_aspirate_components[i].keys():

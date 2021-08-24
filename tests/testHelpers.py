@@ -9,10 +9,10 @@ import helpers
 print("\n Test of function in helpers.py. \n")
 
 class testHelpers(unittest.TestCase):
-    def test_SaveToFile(slef):
+    def test_SaveToFile(self):
         testDict_save = {"this": 1, "is": "two", "1": "a", "test": {"of": 5, "the": "save"}}
-        helpers.SaveToFile("test_save.pck", testDict_save, r"tests/filesForTests")
-        with open (r"tests/filesForTests//test_save.pck", "rb") as file:
+        helpers.SaveToFile(r"tests/filesForTests/test_save.pck", testDict_save)
+        with open (r"tests/filesForTests/test_save.pck", "rb") as file:
             loaded_save = pickle.load(file)
         compare(testDict_save, loaded_save)
 
