@@ -48,4 +48,4 @@ if __name__ == "__main__":
     ## Flush the syringes
     for p in assignment.keys():
         CetoniDevice_action.flushSyringe(pumps=Ps, valves=Vs, pump=p, reservoir=assignment[p])
-    uvicorn.run(app, host="<host IP>", port=<port>) # edited prior to publication
+    uvicorn.run(app, host="<host IP>", port="<port>") # edited prior to publication

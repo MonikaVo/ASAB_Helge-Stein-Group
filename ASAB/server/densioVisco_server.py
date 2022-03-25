@@ -30,7 +30,7 @@ def retrieveData(sampleName:str, method:str, methodtype:str, savePath:str):
     return result
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="<host IP>", port=<port>) # edited prior to publication
+    uvicorn.run(app, host="<host IP>", port="<port>") # edited prior to publication
 
 # TODO:
 # - check, if the requested method is available

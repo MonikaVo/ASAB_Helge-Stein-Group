@@ -1,4 +1,4 @@
-Quelle: https://stackoverflow.com/questions/31684375/automatically-create-requirements-txt
+Quelle: https://stackoverflow.com/questions/31684375/automatically-create-requirements-txt, https://pypi.org/project/pipreqs/
 
 pip install pipreqs
 
