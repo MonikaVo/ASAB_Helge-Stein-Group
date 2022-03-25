@@ -4,8 +4,6 @@ conf = config.config
 import unittest
 from testfixtures import compare
 import pickle
-import os
-import sys
 import utility.helpers
 
 
@@ -21,7 +19,7 @@ class testHelpers(unittest.TestCase):
 
     def test_loadFile(self):
         testDict_load = {"this": 1, "is": "two", "1": "a", "test": {"of": 5, "the": "save"}}
-        loaded_load = utility.helpers.loadFile(r"tests/filesForTests//test_save.pck")
+        loaded_load = utility.helpers.loadFile(r"ASAB/test/FilesForTests//test_save.pck")
         compare(testDict_load, loaded_load)
 
 if __name__ == "__main__":
