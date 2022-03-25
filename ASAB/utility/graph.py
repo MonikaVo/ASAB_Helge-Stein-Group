@@ -1,16 +1,17 @@
-if __name__ == "__main__":
-    from configuration import config
-    conf = config.config
-else:
+## Get the configuration
+try:
+    # if there is a main file, get conf from there
     from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
-
-from utility.helpers import doAppends, loadFile, saveToFile
-doAppends(conf)
+except ImportError:
+    # if the import was not successful, go to default config
+    from ASAB.configuration import default_config
+    conf = default_config.config
 
 import networkx as nx   # https://networkx.org/documentation/stable/tutorial.html
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+from utility.helpers import loadFile, saveToFile
 
 def findClosest(node:str, candidates:list, graph=loadFile(conf["CetoniDeviceDriver"]["setup"]), valvePositionDict:dict=loadFile(conf["CetoniDeviceDriver"]["valvePositionDict"]),  weight:str="dead_volume", direction:str="out"):
     ''' Finds the closest candidate to a given node regarding a specified weight for the path. The direction of the search can be either
@@ -226,7 +227,7 @@ def getTotalQuantity(nodelist:list, quantity:str):   # Corresponds to networkx.p
     ''' This function calculates a total quantity (e.g. dead volume) for a list of nodes. It takes a list of nodes as an input,
     determines the respective dictionary of edges and returns the dead volume as a float. '''
     edgedict = getEdgedictFromNodelist(nodelist=nodelist)
-    quantityTotal = 0.0    
+    quantityTotal = 0.0
     for edg in edgedict.keys():
         quantityTotal += edgedict[edg][quantity]
     return quantityTotal

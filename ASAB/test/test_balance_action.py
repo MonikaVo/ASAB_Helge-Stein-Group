@@ -1,16 +1,8 @@
-import unittest
-from tests.filesForTests import config_test
-from utility.helpers import doAppends, loadFile
+from FilesForTests import config_test
 conf = config_test.config
-doAppends(conf)
 
 import unittest
-from testfixtures import compare
-import serial
-
 from driver import balance_driver
-from action import balance_action
-
 
 class test_balance_action(unittest.TestCase):
 

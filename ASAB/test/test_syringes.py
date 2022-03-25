@@ -1,16 +1,9 @@
-from pickle import load
 import unittest
-from tests.filesForTests import config_test
-import utility
-from utility.helpers import doAppends, loadFile
+from FilesForTests import config_test
 conf = config_test.config
-doAppends(conf)
-
-import unittest
-from testfixtures import compare
-
+from utility.helpers import loadFile
 from utility import syringes
-from utility.syringes import syringe
+import unittest
 
 class test_syringes(unittest.TestCase):
     

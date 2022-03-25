@@ -1,6 +1,13 @@
-from configuration import config
-from utility.helpers import doAppends, saveToFile
-doAppends(config.config)
+## Get the configuration
+try:
+    # if there is a main file, get conf from there
+    from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
+except ImportError:
+    # if the import was not successful, go to default config
+    from ASAB.configuration import default_config
+    conf = default_config.config
+
+from utility.helpers import saveToFile
 
 import numpy as np
 
@@ -25,6 +32,6 @@ syr_25myl = syringe(desig="25_myl", inner_dia_mm=0.728366, piston_stroke_mm=60.)
 
 # Dictionary inlcluding the available syringes:
 Syringes = {"25_ml": syr_25ml, "10_ml": syr_10ml, "25_myl": syr_25myl, "1_ml": syr_1ml, "2_5_ml": syr_2_5ml, "5_ml": syr_5ml}
-saveToFile(saveFile=config.config["syringes"]["savePath"], data=Syringes)
+saveToFile(saveFile=conf["syringes"]["savePath"], data=Syringes)
 
 #TODO: Add minimum and maximum flow

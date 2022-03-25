@@ -1,20 +1,16 @@
 config = dict()
 
-projectFolder = "<path to project>" # edited prior to publication
-auxiliaryFolderHardware = "tests\\filesForTests"
-
-config["utility"] = {"ASAB": projectFolder + "...\\ASAB", # edited prior to publication
-                    "QmixSDK_python": projectFolder + "...\\QmixSDK\\lib\\python", # edited prior to publication
-                    "QmixSDK": projectFolder + "...\\QmixSDK"} # edited prior to publication
+experimentFolder = ".." # edited prior to publication
+auxiliaryFolderHardware = "ASAB\\test\\FilesForTests"
 
 config["balanceDriver"] = {"serialPort": "<COM port>",
                     "settings": {'baudrate': 115200, 'bytesize': 8, 'parity': 'N', 'stopbits': 1, 'xonxoff': False, 'dsrdtr': False, 'rtscts': False, 'timeout': 0, 'write_timeout': None, 'inter_byte_timeout': None},
-                    "simulated": True},
+                    "simulated": True}
 
 config["balance"] = {"simulated": True}
 
 config["CetoniDeviceDriver"] = {"availableSyringes": auxiliaryFolderHardware + "\\syringes_test.pck",
-                    "configPath": projectFolder + "...\\ASAB_Conf1_sim", # edited prior to publication
+                    "configPath": experimentFolder + "...\\ASAB_Conf1_sim", # edited prior to publication
                     "syringeConfig": {"A0.0": "1_ml", "B0.0": "2_5_ml", "C0.0": "2_5_ml", "D0.0": "2_5_ml", "E0.0": "2_5_ml", "F0.0": "2_5_ml"},
                     "pumps": auxiliaryFolderHardware + "\\Pumps_test.pck",
                     "valves": auxiliaryFolderHardware + "\\Valves_test.pck",

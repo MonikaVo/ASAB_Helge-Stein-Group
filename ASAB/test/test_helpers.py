@@ -24,16 +24,5 @@ class testHelpers(unittest.TestCase):
         loaded_load = utility.helpers.loadFile(r"tests/filesForTests//test_save.pck")
         compare(testDict_load, loaded_load)
 
-    def test_doAppends(self):
-        pathesToAppend_target = [conf["utility"]["ASAB"], conf["utility"]["QmixSDK_python"], conf["utility"]["QmixSDK"]]
-        setCWD_target = conf["utility"]["ASAB"]
-
-        utility.helpers.doAppends(conf)
-        
-        for path in pathesToAppend_target:
-            self.assertIn(member=path, container=sys.path, msg="Not all paths were appended.")
-        
-        self.assertEqual(first=setCWD_target, second=os.getcwd(), msg="The working directory was not changed correctly.")
-
 if __name__ == "__main__":
     unittest.main(verbosity=2)
