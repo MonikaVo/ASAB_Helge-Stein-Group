@@ -3,3 +3,5 @@ Quelle: https://stackoverflow.com/questions/31684375/automatically-create-requir
 pip install pipreqs
 
 pipreqs /path/to/project
+
+Structure and packaging based on https://python-packaging-tutorial.readthedocs.io/en/latest/setup_py.html
