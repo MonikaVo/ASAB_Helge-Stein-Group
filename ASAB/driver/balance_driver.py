@@ -7,7 +7,7 @@ except ImportError:
     from ASAB.configuration import default_config
     conf = default_config.config
 
-import serial   #https://pyserial.readthedocs.io/en/latest/pyserial_api.html#serial.Serial.in_waiting
+import serial  # https://pyserial.readthedocs.io/en/latest/pyserial_api.html#serial.Serial.in_waiting
 import time
 import numpy as np
 

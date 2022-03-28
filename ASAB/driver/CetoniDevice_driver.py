@@ -1,11 +1,19 @@
-if __name__ == "__main__":
-    from configuration import config
-    conf = config.config
-else:
+## Get the configuration
+try:
+    # if there is a main file, get conf from there
     from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
+except ImportError:
+    # if the import was not successful, go to default config
+    from ASAB.configuration import default_config
+    conf = default_config.config
 
-from utility.helpers import doAppends, loadFile, saveToFile
-doAppends(conf)
+from ASAB.utility.syringes import loadSyringeDict, syringe
+from ASAB.utility.helpers import saveToFile
+from ASAB.configuration import config
+cf = config.configASAB
+
+import sys
+sys.path.append(cf["QmixSDK_python"])
 
 # Import qmixsdk modules
 from qmixsdk import qmixbus
@@ -13,10 +21,8 @@ from qmixsdk import qmixpump
 from qmixsdk import qmixvalve
 from qmixsdk import qmixcontroller
 
-from utility.syringes import syringe
 
 # Import other modules
-# from utility import graph
 import string # https://www.delftstack.com/howto/python/python-alphabet-list/
 
 class valveObj(qmixvalve.Valve):
@@ -59,16 +65,27 @@ class pumpObj(qmixpump.Pump):
         self.status = "empty"
         # This attribute holds an object of the type "syringe", which contains the information regarding the syringe mounted on the pump module corresponding to the pump object
         self.syringe = syringe(desig="init", inner_dia_mm=0.0, piston_stroke_mm=0.0)
+
+
+
+def loadValvePositionDict(path_to_ValvePositionDict:str):
+    # Open and read the file containing the data
+    with open(path_to_ValvePositionDict, "r") as file:
+        rawString = file.readlines()
+    # Make the rawString string to a dict
+    vPd = dict(rawString)
+    return vPd
+
 class cetoni:
     def __init__(self):
         pass
         
-    def prepareCetoni(config_path:str=conf["CetoniDeviceDriver"]["configPath"], QmixSDK_path:str=conf["utility"]["QmixSDK"], available_syringes:str=conf["CetoniDeviceDriver"]["availableSyringes"], syringe_config:dict=conf["CetoniDeviceDriver"]["syringeConfig"], save_name_VdP=conf["CetoniDeviceDriver"]["valvePositionDict"], save_name_pumps=conf["CetoniDeviceDriver"]["pumps"], save_name_valves=conf["CetoniDeviceDriver"]["valves"], save_name_channels=conf["CetoniDeviceDriver"]["channels"]):
+    def prepareCetoni(config_path:str=conf["CetoniDeviceDriver"]["configPath"], QmixSDK_path:str=cf["QmixSDK"], available_syringes:str=conf["CetoniDeviceDriver"]["availableSyringes"], syringe_config:dict=conf["CetoniDeviceDriver"]["syringeConfig"], save_name_VdP=conf["CetoniDeviceDriver"]["valvePositionDict"], save_name_pumps=conf["CetoniDeviceDriver"]["pumps"], save_name_valves=conf["CetoniDeviceDriver"]["valves"], save_name_channels=conf["CetoniDeviceDriver"]["channels"]):
         ''' This function sets the Cetoni setup operable. It takes the path for the relevant configuration file and the path to the QmixSDK module
         as inputs, prints the detected setup, configures the syringes and returns one dict containing the pumps ("Pumps") and one containing the valves ("Valves"). '''
         
         # Load the available syringes
-        syr = loadFile(available_syringes)
+        syr = loadSyringeDict(available_syringes)
         syringes_dict = syringe_config.copy()
         # Go through all entries in syringe_dict and get the designation of the syringe on each pump and assign the corresponding syringe object from syr to the respective key in the syringe_dict
         for pump in syringes_dict.keys():
@@ -195,11 +212,7 @@ class cetoni:
             Valves[valve].switch_valve_to_position(0)
         '''----------------Preparation end----------------'''
         # Save the valvePositionDict to the path specified by save_name.
-        saveToFile(save_name_VdP, valvePositionDict)
-        # Save the Pumps, Valves and Channels
-        saveToFile(save_name_pumps, Pumps)
-        saveToFile(save_name_valves, Valves)
-        saveToFile(save_name_channels, Channels)
+        saveToFile(savePath=save_name_VdP, data=str(valvePositionDict))
         return Pumps, Valves, Channels
 
     def quitCetoni():
@@ -212,7 +225,7 @@ class cetoni:
         qmixbus.Bus.close()
         '''----------------Finishing end----------------'''
 
-    def getValvePositions(valvesDict:dict, valvePositionDict:dict=loadFile(conf["CetoniDeviceDriver"]["valvePositionDict"])):
+    def getValvePositions(valvesDict:dict, valvePositionDict:dict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"])):
         ''' This function returns the positions of all valves in the system in a dictionary. The designations of the valves are the keys. '''
         valvePos = {}
         for valve in valvePositionDict.keys():

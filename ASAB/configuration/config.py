@@ -1,5 +1,3 @@
-config = dict()
-
 ASAB_folder = "<path to project>" # edited prior to publication
 
 configASAB = {

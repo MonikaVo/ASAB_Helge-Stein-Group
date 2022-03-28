@@ -1,33 +1,26 @@
-import unittest
-from FilesForTests import config_test
+from ASAB.test.FilesForTests import config_test
 conf = config_test.config
 
-import unittest
-from driver import balance_driver
+from ASAB.driver import balance_driver
 
-class test_balance_driver(unittest.TestCase):
+def test___init__():
+    port_target = conf["balanceDriver"]["serialPort"]
+    settings_target = conf["balanceDriver"]["settings"]
 
-    def test___init__(self):
-        port_target = conf["balanceDriver"]["serialPort"]
-        settings_target = conf["balanceDriver"]["settings"]
+    balance1 = balance_driver.balance(simulated=False)
 
-        balance1 = balance_driver.balance(simulated=False)
+    port_result = balance1.port.port
+    settings_result = balance1.port.get_settings()
 
-        port_result = balance1.port.port
-        settings_result = balance1.port.get_settings()
-
-        self.assertEqual(first=port_target, second=port_result, msg="Port is not correct")
-        self.assertDictEqual(d1=settings_target, d2=settings_result, msg="Settings do not match")
+    assert(port_target == port_result)
+    assert(settings_target == settings_result)
 
 
-    
-    def test_readBalance(self):
-        balance2 = balance_driver.balance(simulated=True)
 
-        reading_result = balance2.readBalance()
-        reading_target = balance2.port.target
+def test_readBalance():
+    balance2 = balance_driver.balance(simulated=True)
 
-        self.assertEqual(first=reading_target, second=reading_result, msg="Readings do not match.")
+    reading_result = balance2.readBalance()
+    reading_target = balance2.port.target
 
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    assert(reading_target == reading_result)

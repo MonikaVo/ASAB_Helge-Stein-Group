@@ -11,9 +11,25 @@ import networkx as nx   # https://networkx.org/documentation/stable/tutorial.htm
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from utility.helpers import loadFile, saveToFile
+from ASAB.utility.helpers import saveToFile
+from ASAB.driver.CetoniDevice_driver import loadValvePositionDict
 
-def findClosest(node:str, candidates:list, graph=loadFile(conf["CetoniDeviceDriver"]["setup"]), valvePositionDict:dict=loadFile(conf["CetoniDeviceDriver"]["valvePositionDict"]),  weight:str="dead_volume", direction:str="out"):
+def loadGraph(path_to_graphDict:str=conf["CetoniDeviceDriver"]["setup"]):
+    ''' This function loads a graph and the corresponding positions to allow for drawing of the graph. '''
+    # Open and read the file containing the data
+    with open(path_to_graphDict, "r") as file:
+        rawString = file.readlines()
+    # Make the rawString string to a dict
+    this_graph = eval(rawString)
+    graph = nx.from_dict_of_dicts(this_graph)
+    # Do the same for the positions
+    with open(f"{str(path_to_graphDict[0:-4])}_positions.txt", "r") as file2:
+        rawString = file2.readlines()
+    # Make the rawString string to a dict
+    positions = eval(rawString)
+    return graph
+
+def findClosest(node:str, candidates:list, graph=loadGraph(conf["CetoniDeviceDriver"]["setup"]), valvePositionDict:dict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]),  weight:str="dead_volume", direction:str="out"):
     ''' Finds the closest candidate to a given node regarding a specified weight for the path. The direction of the search can be either
     incoming to the node or outgoing from the node. The default is outgoing. The function returns the closest node among the given candidates
     and the path from the specified node to this candidate node. candidates is of type "list". '''
@@ -47,7 +63,7 @@ def findClosest(node:str, candidates:list, graph=loadFile(conf["CetoniDeviceDriv
     pathToClosest = eval(shortest_distances.loc[shortest_distances["candidate"]==closest, "shortestPath"].values[0])
     return closest, pathToClosest
 
-def findPath(start_node:str, end_node:str, valvePositionDict:dict=loadFile(conf["CetoniDeviceDriver"]["valvePositionDict"]), graph=loadFile(conf["CetoniDeviceDriver"]["setup"]), weight:str="dead_volume"):
+def findPath(start_node:str, end_node:str, valvePositionDict:dict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]), graph=loadGraph(conf["CetoniDeviceDriver"]["setup"]), weight:str="dead_volume"):
     ''' This function finds a path in the graph representing the setup. It uses the function "pathIsValid" to makes sure that no more than two nodes belonging to the same valve are included
     in the path. If this condition is not met by the suggestion obtained by the Dijkstra algorithm, it removes connections in a copy of the graph until it finds a valid path. The path is searched
     from start_node to end_node ''' # TODO: Add optional nodes in between and conditions for the path other than just minimal weight.
@@ -158,13 +174,7 @@ def drawGraph(graph, positions, wlabels=True):
     nx.draw(graph, pos=positions, with_labels=wlabels)
     plt.show()
 
-def loadGraph(graphFile=conf["CetoniDeviceDriver"]["setup"], valvePositionDictFile=conf["CetoniDeviceDriver"]["valvePositionDict"]):
-    ''' This function loads a graph and the corresponding valvePositionDict. '''
-    this_graph = loadFile(graphFile)
-    this_valvePositionDict = loadFile(valvePositionDictFile)
-    return this_graph, this_valvePositionDict
-
-def getValveFromName(node_name, valvePositionDict=loadFile(conf["CetoniDeviceDriver"]["valvePositionDict"])):
+def getValveFromName(node_name, valvePositionDict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"])):
     ''' This function takes a name of a node (as string) as an input and returns the valve it belongs to. If the node does not belong to a valve. None is returned. '''
     # Get the valve from the node name
     valve = node_name[0:2]
@@ -175,7 +185,7 @@ def getValveFromName(node_name, valvePositionDict=loadFile(conf["CetoniDeviceDri
         # If the node does not belong to a valve, return NaN
         return np.NaN
 
-def getEdgedictFromNodelist(nodelist, graph=loadFile(conf["CetoniDeviceDriver"]["setup"])):
+def getEdgedictFromNodelist(nodelist, graph=loadGraph(conf["CetoniDeviceDriver"]["setup"])):
     ''' This function generates a dictionary of edges from a list of nodes. It takes a list of nodes as an input and returns a dictionary of edges with the name of the edge as
     a key. '''
     edgesDict = {}
@@ -217,8 +227,8 @@ def generateGraph(show=True, save=True, path_nodes=conf["graph"]["pathNodes"], p
 
     # If the parameter is set accordingly, save the graph and the positions to a pickle file. Else return the graph.
     if save==True:
-        saveToFile(save_path, graph)
-        saveToFile("{}{}".format(str(save_path[0:-4]), "_positions.pck"), positions)
+        saveToFile(savePath=save_path, data=str(nx.to_dict_of_dicts(graph)))
+        saveToFile(savePath=f"{str(save_path[0:-4])}_positions.txt", data=str(positions))
         return graph
     elif save==False:
         return graph
@@ -232,7 +242,7 @@ def getTotalQuantity(nodelist:list, quantity:str):   # Corresponds to networkx.p
         quantityTotal += edgedict[edg][quantity]
     return quantityTotal
 
-def getValveSettings(nodelist:list, valvePositionDict=loadFile(conf["CetoniDeviceDriver"]["valvePositionDict"])):
+def getValveSettings(nodelist:list, valvePositionDict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"])):
     ''' Based on a list of nodes describing a path in the graph and a dict of valve positions, this function returns the required settings of the valves needed to realise
     this path, in case there are valves included in the path. Otherwise, an empty dict will be returned. The output is of type dict. '''
     valveSettings = {}
@@ -247,7 +257,7 @@ def getValveSettings(nodelist:list, valvePositionDict=loadFile(conf["CetoniDevic
                 pass
     return valveSettings
 
-def pathIsValid(path, valvePositionDict=loadFile(conf["CetoniDeviceDriver"]["valvePositionDict"])):
+def pathIsValid(path, valvePositionDict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"])):
     ''' This function checks a given path regarding its validity. If the path does not pass more than two nodes belonging to the same valve, it is considered being valid. '''
     # Get the valves from the node names and save them in a list.
     valveList_orig = [getValveFromName(node, valvePositionDict) for node in path]
@@ -264,7 +274,7 @@ def pathIsValid(path, valvePositionDict=loadFile(conf["CetoniDeviceDriver"]["val
         # Else it is valid.
         return True
 
-def getSystemStatus(path=[], full=True, graph=loadFile(conf["CetoniDeviceDriver"]["setup"])):
+def getSystemStatus(path=[], full=True, graph=loadGraph(conf["CetoniDeviceDriver"]["setup"])):
     ''' This function returns the status of all edges in the system. The output is a dict, which tells, if a certain edge is empty or filled with some liquid. If full is True, the status of all
     edges is returned, otherwise only the status of the edges in the requested path are returned. '''
     # If the status is requested for the full system
@@ -284,7 +294,7 @@ def getSystemStatus(path=[], full=True, graph=loadFile(conf["CetoniDeviceDriver"
             status[edges[edge]["designation"]] = statFull[edges[edge]["designation"]]
     return status
 
-def updateSystemStatus(path, graph=loadFile(conf["CetoniDeviceDriver"]["setup"])):
+def updateSystemStatus(path, graph=loadGraph(conf["CetoniDeviceDriver"]["setup"])):
     ''' This function updates the status of edges in a path. It takes a path (list) as an input. The resulting status can be requested using the getSystemStatus function. '''
     # Get the edges of the relevant path
     edges = getEdgedictFromNodelist(nodelist=path, graph=graph)

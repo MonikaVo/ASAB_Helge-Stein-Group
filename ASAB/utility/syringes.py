@@ -4,10 +4,10 @@ try:
     from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
 except ImportError:
     # if the import was not successful, go to default config
-    from ASAB.configuration import default_config
-    conf = default_config.config
+    from ASAB.test.FilesForTests import config_test
+    conf = config_test.config
 
-from utility.helpers import saveToFile
+from ASAB.utility.helpers import loadTxtFile, saveToFile
 
 import numpy as np
 
@@ -22,16 +22,30 @@ class syringe:
         self.piston_stroke_mm = piston_stroke_mm
         self.minimum_volume_mL = np.around(((np.pi*(inner_dia_mm/2.)**2*piston_stroke_mm)/1000.) * 0.15, 4) # 15 % of the total volume. Minimum according to user manual of syringes.   https://arrayjson.com/numpy-pi/
 
+def from_dict(dict:dict):
+    # This function initialises a syringe based on a dict containing the attributes as keys and their respective values as value
+    syringeFromDict = syringe(desig=dict["desig"], inner_dia_mm=dict["inner_dia_mm"], piston_stroke_mm=dict["piston_stroke_mm"])
+    return syringeFromDict
+
+def loadSyringeDict(path_to_syringeDict:str):
+    # initialise an empty syringeDict
+    syringeDict = {}
+    dataDict = loadTxtFile(path_to_syringeDict)
+    # Make the values in the dict to syringes
+    for key, value in dataDict.items():
+        syringeDict[key] = from_dict(value)
+    return syringeDict
+
 # List of available Syringes:
-syr_25ml = syringe(desig="25_ml", inner_dia_mm=23.0329, piston_stroke_mm=60.)
-syr_10ml = syringe(desig="10_ml", inner_dia_mm=14.5673, piston_stroke_mm=60.)
-syr_5ml = syringe(desig="5_ml", inner_dia_mm=10.3006, piston_stroke_mm=60.)
-syr_2_5ml = syringe(desig="2_5_ml", inner_dia_mm=7.28366, piston_stroke_mm=60.)
-syr_1ml = syringe(desig="1_ml", inner_dia_mm=4.60659,piston_stroke_mm=60.)
+syr_25mL = syringe(desig="25_mL", inner_dia_mm=23.0329, piston_stroke_mm=60.)
+syr_10mL = syringe(desig="10_mL", inner_dia_mm=14.5673, piston_stroke_mm=60.)
+syr_5mL = syringe(desig="5_mL", inner_dia_mm=10.3006, piston_stroke_mm=60.)
+syr_2_5mL = syringe(desig="2_5_mL", inner_dia_mm=7.28366, piston_stroke_mm=60.)
+syr_1mL = syringe(desig="1_mL", inner_dia_mm=4.60659,piston_stroke_mm=60.)
 syr_25myl = syringe(desig="25_myl", inner_dia_mm=0.728366, piston_stroke_mm=60.)
 
 # Dictionary inlcluding the available syringes:
-Syringes = {"25_ml": syr_25ml, "10_ml": syr_10ml, "25_myl": syr_25myl, "1_ml": syr_1ml, "2_5_ml": syr_2_5ml, "5_ml": syr_5ml}
-saveToFile(saveFile=conf["syringes"]["savePath"], data=Syringes)
+Syringes = {"25_mL": syr_25mL.__dict__, "10_mL": syr_10mL.__dict__, "25_myl": syr_25myl.__dict__, "1_mL": syr_1mL.__dict__, "2_5_mL": syr_2_5mL.__dict__, "5_mL": syr_5mL.__dict__}
+saveToFile(savePath=conf["syringes"]["savePath"], data=str(Syringes))
 
 #TODO: Add minimum and maximum flow

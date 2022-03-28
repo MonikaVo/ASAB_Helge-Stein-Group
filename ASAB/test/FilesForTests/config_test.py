@@ -32,7 +32,23 @@ config["CetoniDeviceDriver"] = {"availableSyringes": auxiliaryFolderHardware + "
                     "pumpInit": {"target": ['aspirate', 'calibrate', 'clear_fault', 'dispense', 'enable', 'generate_flow', 'get_device_name', 'get_device_property', 'get_dosed_volume', 'get_error_message', 'get_fill_level', 'get_flow_is', 'get_flow_rate_max', 'get_flow_unit', 'get_no_of_pumps', 'get_node_id', 'get_position_counter_value', 'get_pump_name', 'get_syringe_param', 'get_target_volume', 'get_valve', 'get_volume_max', 'get_volume_unit', 'handle', 'has_valve', 'is_calibration_finished', 'is_enabled', 'is_in_fault_state', 'is_pumping', 'lookup_by_device_index', 'lookup_by_name', 'name', 'pump_volume', 'read_last_error', 'read_last_error_code', 'restore_position_counter_value', 'set_communication_state', 'set_device_property', 'set_fill_level', 'set_flow_unit', 'set_syringe_param', 'set_volume_unit', 'status', 'stop_all_pumps', 'stop_pumping', 'syringe']}}}
 
 config["CetoniDevice"] = {"testInputFillSyringe": [{"pump": "A0.0", "volume": 0.3, "waste": "Reservoir7", "valvePos":{'V1': 5, 'V2': 4, 'V3': 3, 'V4': 9, 'V5': 7, 'V6': 8, 'Av': 3, 'Bv': 1, 'Cv': 0, 'Dv': 1, 'Ev': 0, 'Fv': 0}}],
-                    "testInputMix":[{"mixRatio": {"Reservoir1": 0.150, "Reservoir2": 0.400, "Reservoir3": 0.600}, "waste": "Reservoir6", "gas": "Reservoir5"}]}
+                    "testInputMix":[{"mixRatio": {"Reservoir1": 0.150, "Reservoir2": 0.400, "Reservoir3": 0.600}, "waste": "Reservoir6", "gas": "Reservoir5"}],
+                    "waste": "Reservoir8",
+                    "gas": "Reservoir7",
+                    "assignment": {"A0.0": "Reservoir1", "B0.0": "Reservoir2", "C0.0": "Reservoir3", "D0.0": "Reservoir4", "E0.0": "Reservoir6"},
+                    "compoundsReservoirs": {"LiPF6_salt_in_EC_DMC_1:1": "Reservoir1", "EC_DMC_1:1": "Reservoir2", "LiPF6_salt_in_EC_EMC_3:7": "Reservoir3", "EC_EMC_3:7": "Reservoir4", "Hexane": "Reservoir6"},
+                    "pathsToClean": [['A0.0', 'A0.1', 'Av1', 'V1.1', 'V1.0', 'V2.0', 'V2.7', 'V3.0', 'V3.1', 'Reservoir1'],
+                        ['B0.0', 'B0.1', 'Bv1', 'V1.2', 'V1.0', 'V2.0', 'V2.7', 'V3.0', 'V3.2', 'Reservoir2'],
+                        ['C0.0', 'C0.1', 'Cv1', 'V1.3', 'V1.0', 'V2.0', 'V2.7', 'V3.0', 'V3.3', 'Reservoir3'],
+                        ['D0.0', 'D0.1', 'Dv1', 'V1.4', 'V1.0', 'V2.0', 'V2.7', 'V3.0', 'V3.4', 'Reservoir4'],
+                        ['E0.0', 'E0.1', 'Ev1', 'V1.5', 'V1.0', 'V2.0', 'V2.7', 'V3.0', 'V3.5', 'Reservoir5'],
+                        ['F0.0', 'F0.1', 'Fv1', 'V1.6', 'V1.0', 'V2.0', 'V2.7', 'V3.0', 'V3.6', 'Reservoir6'],
+                        ['F0.0', 'F0.1', 'Fv1', 'V1.6', 'V1.0', 'V2.0', 'V2.1', 'AY2', 'AY1', 'Av2', 'A0.1', 'A0.0'],
+                        ['A0.0', 'A0.1', 'Av1', 'V1.1', 'V1.0', 'V2.0', 'V2.2', 'BY2', 'BY1', 'Bv2', 'B0.1', 'B0.0'],
+                        ['B0.0', 'B0.1', 'Bv1', 'V1.2', 'V1.0', 'V2.0', 'V2.3', 'CY2', 'CY1', 'Cv2', 'C0.1', 'C0.0'],
+                        ['C0.0', 'C0.1', 'Cv1', 'V1.3', 'V1.0', 'V2.0', 'V2.4', 'DY2', 'DY1', 'Dv2', 'D0.1', 'D0.0'],
+                        ['D0.0', 'D0.1', 'Dv1', 'V1.4', 'V1.0', 'V2.0', 'V2.5', 'EY2', 'EY1', 'Ev2', 'E0.1', 'E0.0'],
+                        ['E0.0', 'E0.1', 'Ev1', 'V1.5', 'V1.0', 'V2.0', 'V2.6', 'FY2', 'FY1', 'Fv2', 'F0.1', 'F0.0']]}
 
 config["syringes"] = {"savePath": auxiliaryFolderHardware + "\\syringes_test.pck",
                     "testInput": {"testInit": [{"designation": "a", "innerDia": 12.0, "pistonStroke": 55.0}, {"designation": "2_5_ml", "innerDia": 7.28366, "pistonStroke": 60}]}}

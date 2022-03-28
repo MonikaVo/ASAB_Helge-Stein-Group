@@ -1,15 +1,13 @@
-from sys import path
-
-from numpy.random import sample
-if __name__ == "__main__":
-    from configuration import config
-    conf = config.config
-else:
+## Get the configuration
+try:
+    # if there is a main file, get conf from there
     from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
+except ImportError:
+    # if the import was not successful, go to default config
+    from ASAB.configuration import default_config
+    conf = default_config.config
 
-import utility
-from utility.helpers import doAppends, loadFile
-doAppends(conf)
+from ASAB.utility.helpers import loadFile
 
 import numpy as np
 import pandas as pd
@@ -19,12 +17,18 @@ import time
 
 import itertools as it
 
-from qmixsdk import qmixbus, qmixpump
+from ASAB.configuration import config
+cf = config.configASAB
 
-from driver import CetoniDevice_driver, balance_driver
-from action import balance_action, densioVisco_action
-from utility import graph, syringes
-from driver.CetoniDevice_driver import pumpObj, valveObj
+import sys
+sys.path.append(cf["QmixSDK_python"])
+
+from qmixsdk import qmixbus
+
+from ASAB.driver import CetoniDevice_driver, balance_driver
+from ASAB.action import balance_action, densioVisco_action
+from ASAB.utility import graph
+from ASAB.driver.CetoniDevice_driver import pumpObj
 
 def flushSyringe(pumps:dict, valves:dict, pump:str, reservoir:str, waste:str=conf["CetoniDevice"]["waste"], flow:float=conf["CetoniDeviceDriver"]["flow"], repeat:int=3):
     ''' This function flushes the syringe with the fluid, which will be aspirated in the syringe in order to dilute remainders from previous fluids. '''
@@ -203,7 +207,7 @@ def emptySyringes(pumps:dict, valves:dict, waste:str=conf["CetoniDevice"]["waste
         timer.wait_until(pumps[pump].is_pumping, False)
 
 
-def cleanMixingsystem(pumpsDict:dict, valvesDict:dict, medium1:str, intermediate:bool = True, medium2:str=conf["CetoniDevice"]["gas"], waste=conf["CetoniDevice"]["waste"], paths=conf["CetoniDevice"]["pathsToClean"], valvePositionDict:dict=loadFile(conf["CetoniDeviceDriver"]["valvePositionDict"]), setup=loadFile(conf["CetoniDeviceDriver"]["setup"]), flow:float=conf["CetoniDeviceDriver"]["flow"], repeats:int = 3):
+def cleanMixingsystem(pumpsDict:dict, valvesDict:dict, medium1:str, intermediate:bool = True, medium2:str=conf["CetoniDevice"]["gas"], waste=conf["CetoniDevice"]["waste"], paths=conf["CetoniDevice"]["pathsToClean"], valvePositionDict:dict=CetoniDevice_driver.cetoni.loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]), setup=loadFile(conf["CetoniDeviceDriver"]["setup"]), flow:float=conf["CetoniDeviceDriver"]["flow"], repeats:int = 3):
     ''' This function cleans the used paths of an experiment first using solvent and subsequently using gas. It is intended to be used after small experiments, where a cleaning of the full
     system will not be reasonable. It requires all the tubing, which is not solvent and not gas to be put to the waste. '''
     # TODO: Test this function!!! TODO: Pump all the remainders in the pumps to one pump and again to the waste in order to reduce the remaining amount of solvent.
@@ -367,7 +371,7 @@ def cleanAll(pumpsDict:dict, valvesDict:dict, medium1:str, intermediate:bool=Tru
     goToRefPos(pumpsDict=pumpsDict, valvesDict=valvesDict, mode="end")
     return True
 
-def switchValves(nodelist:list, valvesDict:dict, settings:dict={}, valvePositionDict:dict=loadFile(conf["CetoniDeviceDriver"]["valvePositionDict"])):
+def switchValves(nodelist:list, valvesDict:dict, settings:dict={}, valvePositionDict:dict=CetoniDevice_driver.cetoni.loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"])):
     ''' This function gets the valve positions required to realize a certain path and switches the valves accordingly. '''
     # Check, if the function is called with a list of nodes or a list of settings
     if len(settings) == 0:
@@ -385,7 +389,7 @@ def switchValves(nodelist:list, valvesDict:dict, settings:dict={}, valvePosition
             # Print how the valves are switched
             print(f"{valve}: {valvesDict[valve].actual_valve_position()}")
 
-def fillSyringe(pump:pumpObj, volume:float, valvesDict:dict, reservoir:str, waste:str=conf["CetoniDevice"]["waste"], flow:float=conf["CetoniDeviceDriver"]["flow"], setup=loadFile(conf["CetoniDeviceDriver"]["setup"]), valvePositionDict:dict=loadFile(conf["CetoniDeviceDriver"]["valvePositionDict"]), simulateBalance:bool=conf["CetoniDeviceDriver"]["simulateBalance"]):
+def fillSyringe(pump:pumpObj, volume:float, valvesDict:dict, reservoir:str, waste:str=conf["CetoniDevice"]["waste"], flow:float=conf["CetoniDeviceDriver"]["flow"], setup=loadFile(conf["CetoniDeviceDriver"]["setup"]), valvePositionDict:dict=CetoniDevice_driver.cetoni.loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]), simulateBalance:bool=conf["CetoniDeviceDriver"]["simulateBalance"]):
         ''' This function ensures that the syringe does not contain gas, but only liquid. '''
         print(flow)
         # Initialise a balance object
