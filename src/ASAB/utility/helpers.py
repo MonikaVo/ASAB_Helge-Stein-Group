@@ -20,4 +20,9 @@ def typeCheck(object, target_type):
     ''' This function checks, if the type of the given object is the same as target type. It returns a bool value, which is True, if the types match and False otherwise. '''
     return type(object) == target_type
 
-typeCheck("abc", dict)
+# TODO:Test this function
+def typeCheckDict(inputTypes:dict):
+    ''' This function checks the type for several input parameters passed as a dict. It passes, if the types match and raises a ValueError, if one of the types is incorrect. '''
+    for inputParam in inputTypes.keys():
+        if (not typeCheck(eval(inputParam), inputTypes[inputParam])):
+            raise ValueError(f'Incorrect type of {inputParam} {type(inputParam)} instead of {inputTypes[inputParam]}.')    # https://stackoverflow.com/questions/20844347/how-would-i-make-a-custom-error-message-in-python

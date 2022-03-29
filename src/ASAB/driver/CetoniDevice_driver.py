@@ -7,22 +7,22 @@ except ImportError:
     from ASAB.configuration import default_config
     conf = default_config.config
 
-from ASAB.utility.syringes import loadSyringeDict, syringe
-from ASAB.utility.helpers import saveToFile, typeCheck
 from ASAB.configuration import config
 cf = config.configASAB
 
+## Imports from ASAB
+from ASAB.utility.syringes import loadSyringeDict, syringe
+from ASAB.utility.helpers import saveToFile, typeCheck
+
+# Import from QmixSDK
 import sys
 sys.path.append(cf["QmixSDK_python"])
-
-# Import qmixsdk modules
 from qmixsdk import qmixbus
 from qmixsdk import qmixpump
 from qmixsdk import qmixvalve
 from qmixsdk import qmixcontroller
 
-
-# Import other modules
+# Other imports
 import string # https://www.delftstack.com/howto/python/python-alphabet-list/
 from typing import Union
 
@@ -85,7 +85,7 @@ def getValvePositionDict(vPd:Union[str,dict]):
     elif typeCheck(vPd, str):
         valvePositionDict = loadValvePositionDict(vPd)
     else:
-        raise ValueError
+        raise ValueError(f'Incorrect type of {vPd} {type(vPd)} instead of str or dict.')
     return valvePositionDict
 
 class cetoni:

@@ -7,14 +7,16 @@ except ImportError:
     from ASAB.configuration import default_config
     conf = default_config.config
 
-from typing import Union    #, TypeVar TODO: Fix type hints for graph. Consider using TypeVar
-from multiprocessing.sharedctypes import Value
+## Imports from ASAB
+from ASAB.utility.helpers import saveToFile, typeCheck
+from ASAB.driver.CetoniDevice_driver import getValvePositionDict, loadValvePositionDict
+
+## Other imports
+from typing import Union
 import networkx as nx   # https://networkx.org/documentation/stable/tutorial.html
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from ASAB.utility.helpers import saveToFile, typeCheck
-from ASAB.driver.CetoniDevice_driver import getValvePositionDict, loadValvePositionDict
 
 def loadGraph(path_to_graphDict:str=conf["CetoniDeviceDriver"]["setup"]):
     ''' This function loads a graph and the corresponding positions to allow for drawing of the graph. '''
@@ -42,7 +44,7 @@ def getGraph(graph:Union[str,nx.DiGraph]):
         graph = loadGraph(graph)
     else:
         print("graph:", type(graph))
-        raise ValueError
+        raise ValueError(f'Incorrect type of {graph} {type(graph)} instead of str or nx.DiGraph.')
     return graph
 
 def findClosest(node:str, candidates:list, graph:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"], weight:str="dead_volume", direction:str="out"):

@@ -7,8 +7,10 @@ except ImportError:
     from ASAB.configuration import default_config
     conf = default_config.config
 
+## Imports from ASAB
 from ASAB.utility.helpers import loadTxtFile, saveToFile
 
+## Other imports
 import numpy as np
 
 class syringe:
