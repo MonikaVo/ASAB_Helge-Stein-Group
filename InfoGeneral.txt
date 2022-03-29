@@ -4,4 +4,4 @@ pip install pipreqs
 
 pipreqs /path/to/project
 
-Structure and packaging based on https://python-packaging-tutorial.readthedocs.io/en/latest/setup_py.html
+Structure and packaging based on https://python-packaging-tutorial.readthedocs.io/en/latest/setup_py.html and https://setuptools.pypa.io/en/latest/userguide/package_discovery.html#flat-layout (src-layout)

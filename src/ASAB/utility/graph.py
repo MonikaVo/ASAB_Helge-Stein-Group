@@ -7,32 +7,56 @@ except ImportError:
     from ASAB.configuration import default_config
     conf = default_config.config
 
+from typing import Union    #, TypeVar TODO: Fix type hints for graph. Consider using TypeVar
+from multiprocessing.sharedctypes import Value
 import networkx as nx   # https://networkx.org/documentation/stable/tutorial.html
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from ASAB.utility.helpers import saveToFile
-from ASAB.driver.CetoniDevice_driver import loadValvePositionDict
+from ASAB.utility.helpers import saveToFile, typeCheck
+from ASAB.driver.CetoniDevice_driver import getValvePositionDict, loadValvePositionDict
 
 def loadGraph(path_to_graphDict:str=conf["CetoniDeviceDriver"]["setup"]):
     ''' This function loads a graph and the corresponding positions to allow for drawing of the graph. '''
+    # Check the type of the input
+    if not typeCheck(path_to_graphDict, str):
+        raise ValueError
     # Open and read the file containing the data
     with open(path_to_graphDict, "r") as file:
-        rawString = file.readlines()
+        rawString = file.readlines()[0]
     # Make the rawString string to a dict
     this_graph = eval(rawString)
     graph = nx.from_dict_of_dicts(this_graph)
     # Do the same for the positions
     with open(f"{str(path_to_graphDict[0:-4])}_positions.txt", "r") as file2:
-        rawString = file2.readlines()
+        rawString = file2.readlines()[0]
     # Make the rawString string to a dict
     positions = eval(rawString)
     return graph
 
-def findClosest(node:str, candidates:list, graph=loadGraph(conf["CetoniDeviceDriver"]["setup"]), valvePositionDict:dict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]),  weight:str="dead_volume", direction:str="out"):
+def getGraph(graph:Union[str,nx.DiGraph]):
+    ''' This function does a type check of the given graph and if it is not yet a graph object, it loads a graph object from the given file. '''
+    if typeCheck(graph, nx.DiGraph):
+        graph = graph
+    elif typeCheck(graph, str):
+        graph = loadGraph(graph)
+    else:
+        print("graph:", type(graph))
+        raise ValueError
+    return graph
+
+def findClosest(node:str, candidates:list, graph:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"], weight:str="dead_volume", direction:str="out"):
     ''' Finds the closest candidate to a given node regarding a specified weight for the path. The direction of the search can be either
     incoming to the node or outgoing from the node. The default is outgoing. The function returns the closest node among the given candidates
     and the path from the specified node to this candidate node. candidates is of type "list". '''
+    ## Check the input types
+    # check node, candidates, weight and direction
+    if (not typeCheck(node, str)) or (not typeCheck(candidates, list)) or (not typeCheck(weight, str)) or (not typeCheck(direction, str)):
+        raise ValueError
+    # check graph
+    graph = getGraph(graph)
+    # check valvePositionDict
+    valvePositionDict = getValvePositionDict(valvePositionDict)
     # Put together a dataframe to store the path lengths
     startingData = np.zeros((len(candidates), 3), dtype=object)
     startingData[:,0] = candidates
@@ -63,10 +87,18 @@ def findClosest(node:str, candidates:list, graph=loadGraph(conf["CetoniDeviceDri
     pathToClosest = eval(shortest_distances.loc[shortest_distances["candidate"]==closest, "shortestPath"].values[0])
     return closest, pathToClosest
 
-def findPath(start_node:str, end_node:str, valvePositionDict:dict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]), graph=loadGraph(conf["CetoniDeviceDriver"]["setup"]), weight:str="dead_volume"):
+def findPath(start_node:str, end_node:str, valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"], graph:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], weight:str="dead_volume"):
     ''' This function finds a path in the graph representing the setup. It uses the function "pathIsValid" to makes sure that no more than two nodes belonging to the same valve are included
     in the path. If this condition is not met by the suggestion obtained by the Dijkstra algorithm, it removes connections in a copy of the graph until it finds a valid path. The path is searched
     from start_node to end_node ''' # TODO: Add optional nodes in between and conditions for the path other than just minimal weight.
+    ## Check the input types
+    # check start_node, end_node, weight and direction
+    if (not typeCheck(start_node, str)) or (not typeCheck(end_node, str)) or (not typeCheck(weight, str)):
+        raise ValueError
+    # check graph
+    graph = getGraph(graph)
+    # check valvePositionDict
+    valvePositionDict = getValvePositionDict(valvePositionDict)
     # Find the initial path using the Dijkstra-algorithm.
     initial_path = nx.dijkstra_path(graph, start_node, end_node, weight=weight)
     # Get the valves for the nodes in the path
@@ -128,7 +160,7 @@ def findPath(start_node:str, end_node:str, valvePositionDict:dict=loadValvePosit
         return selected_path
 
 # TODO: Add comments
-def checkConsistency(path_nodes=conf["graph"]["pathNodes"], path_edges=conf["graph"]["pathEdges"], path_tubing=conf["graph"]["pathTubing"]):
+def checkConsistency(path_nodes:str=conf["graph"]["pathNodes"], path_edges:str=conf["graph"]["pathEdges"], path_tubing:str=conf["graph"]["pathTubing"]):
     ''' This function checks, if the setup files for the graph are consistent. It checks whether all the edges given in
     tubing.csv are contained in edges.csv and if all nodes referenced in tubing.csv are contained in nodes.csv. It returns
     three results for edges and nodes, edges and nodes.  '''
@@ -153,7 +185,7 @@ def checkConsistency(path_nodes=conf["graph"]["pathNodes"], path_edges=conf["gra
         new_edges = tubing_edges_frame[[edge not in edges for edge in edges_tubing]]
         return edgs and nods, new_edges, new_nodes
 
-def appendEdge(edgelst, edge_name, edgeNodes, edgeProps, reverse=False):
+def appendEdge(edgelst:list, edge_name:str, edgeNodes:pd.DataFrame, edgeProps:pd.DataFrame, reverse=False):
     ''' This function adds an edge to a list of edges. The edge is defined according to the format required by the graph. Data is taken from pandas dataframes containing nodes and
     properties of the edges. If the option reverse is set to true, then the edge is considered to be undirected and the reverse edge is also added to the list. This enable passage
     of the path in both directions in a directed graph. '''
@@ -169,13 +201,27 @@ def appendEdge(edgelst, edge_name, edgeNodes, edgeProps, reverse=False):
             "diameter": float(edgeProps.loc[edgeProps["edge"] == edge_name, "diameter"].values[0]), "dead_volume": float(edgeProps.loc[edgeProps["edge"] == edge_name, "dead_volume"].values[0]),
             "status": edgeProps.loc[edgeProps["edge"] == edge_name, "status"].values[0]}))
 
-def drawGraph(graph, positions, wlabels=True):
+# TODO: also check and load positions
+def drawGraph(graph:nx.DiGraph, positions:dict, wlabels:bool=True):
     ''' This function draws and shows a graph. '''
+    ## Check types
+    # check positions and wlabels
+    if (not type(positions)==dict) or (not type(wlabels) == bool):
+        print("positions:", type(positions), "wlabels:", type(wlabels))
+        raise ValueError
+    # check graph
+    graph = getGraph(graph)
     nx.draw(graph, pos=positions, with_labels=wlabels)
     plt.show()
 
-def getValveFromName(node_name, valvePositionDict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"])):
+def getValveFromName(node_name:str, valvePositionDict=conf["CetoniDeviceDriver"]["valvePositionDict"]):
     ''' This function takes a name of a node (as string) as an input and returns the valve it belongs to. If the node does not belong to a valve. None is returned. '''
+    ## Check types
+    # check node_name
+    if (not type(node_name)==str):
+        raise ValueError
+    # check valvePositionDict
+    valvePositionDict = getValvePositionDict(valvePositionDict)
     # Get the valve from the node name
     valve = node_name[0:2]
     if valve in valvePositionDict.keys():
@@ -185,16 +231,29 @@ def getValveFromName(node_name, valvePositionDict=loadValvePositionDict(conf["Ce
         # If the node does not belong to a valve, return NaN
         return np.NaN
 
-def getEdgedictFromNodelist(nodelist, graph=loadGraph(conf["CetoniDeviceDriver"]["setup"])):
+def getEdgedictFromNodelist(nodelist:list, graph=conf["CetoniDeviceDriver"]["setup"]):
     ''' This function generates a dictionary of edges from a list of nodes. It takes a list of nodes as an input and returns a dictionary of edges with the name of the edge as
     a key. '''
+    ## Chec input types
+    # check nodelist
+    if (not type(nodelist)==list):
+        raise ValueError
+    # check graph
+    graph = getGraph(graph)
+
     edgesDict = {}
     for nd in nodelist:
         if (nodelist.index(nd)+1) < (len(nodelist)):
             edgesDict[graph[nd][nodelist[nodelist.index(nd)+1]]["name"]] = graph[nd][nodelist[nodelist.index(nd)+1]]    # https://networkx.org/documentation/stable/reference/classes/generated/networkx.Graph.get_edge_data.html
     return edgesDict
 
-def generateGraph(show=True, save=True, path_nodes=conf["graph"]["pathNodes"], path_edges=conf["graph"]["pathEdges"], path_tubing=conf["graph"]["pathTubing"], save_path=conf["graph"]["savePath"]):
+def generateGraph(show:bool=True, save:bool=True, path_nodes:str=conf["graph"]["pathNodes"], path_edges:str=conf["graph"]["pathEdges"], path_tubing:str=conf["graph"]["pathTubing"], save_path:str=conf["graph"]["savePath"]):
+    ''' This function generates a graph including the corresponding node positions and it can save both to the save_path according to the setting of the save parameter. '''
+    ## Check input types
+    # check show, save, path_nodes, path_edges, path_tubing and save_path
+    if (not type(show)==bool) or (not type(save)==bool) or (not type(path_nodes)==str) or (not type(path_edges)==str) or (not type(path_tubing)==str) or (not type(save_path)==str):
+        raise ValueError
+
     # Load the information regarding the nodes from nodes.csv to nodes_info.
     nodes_info = pd.read_csv(path_nodes, sep=";")
     # Load the information regarding the edges from edges.csv to nodes_info.
@@ -236,15 +295,27 @@ def generateGraph(show=True, save=True, path_nodes=conf["graph"]["pathNodes"], p
 def getTotalQuantity(nodelist:list, quantity:str):   # Corresponds to networkx.path_weight.
     ''' This function calculates a total quantity (e.g. dead volume) for a list of nodes. It takes a list of nodes as an input,
     determines the respective dictionary of edges and returns the dead volume as a float. '''
+    ## Check input types
+    # check nodelist and quantity
+    if (not type(nodelist)==list) or (not type(quantity)==str):
+        raise ValueError
+
     edgedict = getEdgedictFromNodelist(nodelist=nodelist)
     quantityTotal = 0.0
     for edg in edgedict.keys():
         quantityTotal += edgedict[edg][quantity]
     return quantityTotal
 
-def getValveSettings(nodelist:list, valvePositionDict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"])):
+def getValveSettings(nodelist:list, valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"]):
     ''' Based on a list of nodes describing a path in the graph and a dict of valve positions, this function returns the required settings of the valves needed to realise
     this path, in case there are valves included in the path. Otherwise, an empty dict will be returned. The output is of type dict. '''
+    ## Check input types
+    # check nodelist
+    if (not type(nodelist)==list):
+        raise ValueError
+    # check valvePositionDict
+    valvePositionDict = getValvePositionDict(valvePositionDict)
+
     valveSettings = {}
     for node in nodelist:
         valve = node[0:2]
@@ -257,8 +328,15 @@ def getValveSettings(nodelist:list, valvePositionDict=loadValvePositionDict(conf
                 pass
     return valveSettings
 
-def pathIsValid(path, valvePositionDict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"])):
+def pathIsValid(path:list, valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"]):
     ''' This function checks a given path regarding its validity. If the path does not pass more than two nodes belonging to the same valve, it is considered being valid. '''
+    ## Check input types
+    # check path
+    if (not type(path)==list):
+        raise ValueError
+    # check valvePositionDict
+    valvePositionDict = getValvePositionDict(valvePositionDict)
+    
     # Get the valves from the node names and save them in a list.
     valveList_orig = [getValveFromName(node, valvePositionDict) for node in path]
     # Transfer list to pandas dataframe.
@@ -274,9 +352,16 @@ def pathIsValid(path, valvePositionDict=loadValvePositionDict(conf["CetoniDevice
         # Else it is valid.
         return True
 
-def getSystemStatus(path=[], full=True, graph=loadGraph(conf["CetoniDeviceDriver"]["setup"])):
+def getSystemStatus(path:list=[], full:bool=True, graph:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"]):
     ''' This function returns the status of all edges in the system. The output is a dict, which tells, if a certain edge is empty or filled with some liquid. If full is True, the status of all
     edges is returned, otherwise only the status of the edges in the requested path are returned. '''
+    ## Check input types
+    # check path and full
+    if (not type(path)==list) or (not type(full)==bool):
+        raise ValueError
+    # check graph
+    graph = getGraph(graph)
+    
     # If the status is requested for the full system
     if full:
         # The status corresponds to the status for each edge
@@ -294,8 +379,15 @@ def getSystemStatus(path=[], full=True, graph=loadGraph(conf["CetoniDeviceDriver
             status[edges[edge]["designation"]] = statFull[edges[edge]["designation"]]
     return status
 
-def updateSystemStatus(path, graph=loadGraph(conf["CetoniDeviceDriver"]["setup"])):
+def updateSystemStatus(path:list, graph:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"]):
     ''' This function updates the status of edges in a path. It takes a path (list) as an input. The resulting status can be requested using the getSystemStatus function. '''
+    ## Check input types
+    # check path
+    if (not type(path)==list):
+        raise ValueError
+    # check graph
+    graph = getGraph(graph)
+    
     # Get the edges of the relevant path
     edges = getEdgedictFromNodelist(nodelist=path, graph=graph)
     # Go through all the edges in the graph
@@ -309,11 +401,16 @@ def updateSystemStatus(path, graph=loadGraph(conf["CetoniDeviceDriver"]["setup"]
             # If there is no edge in the opposite direction, continue
             pass
 
-def findPumps(pumps:dict, **conditions):
+def findPumps(pumps:dict, **conditions:str):
     ''' This function searches for a pump according to criteria given as arguments.
     The conditions must be of the format: key=column label in the dataframe, value contains the condition using the variable name "target".
     Secondary filtering requirements can be given in a key "secondary" in the conditions, which contains a dict. They keys of this dict
     must match the column names in the dataframe and the values must be functions like np.min or np.max. '''
+    ## Check input types
+    # check pumps
+    if (not type(pumps)==list):
+        raise ValueError
+    
     # TODO: Test this function!!!
     # Gather the current information on all the pumps and their syringes
     pump_candidates = pd.DataFrame(columns=["pumpName", "pump", "maximumVolume", "minimumVolume", "status"])

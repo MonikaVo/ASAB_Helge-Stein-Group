@@ -8,7 +8,7 @@ except ImportError:
     conf = default_config.config
 
 from ASAB.utility.syringes import loadSyringeDict, syringe
-from ASAB.utility.helpers import saveToFile
+from ASAB.utility.helpers import saveToFile, typeCheck
 from ASAB.configuration import config
 cf = config.configASAB
 
@@ -24,6 +24,7 @@ from qmixsdk import qmixcontroller
 
 # Import other modules
 import string # https://www.delftstack.com/howto/python/python-alphabet-list/
+from typing import Union
 
 class valveObj(qmixvalve.Valve):
     def __init__(self):
@@ -66,15 +67,26 @@ class pumpObj(qmixpump.Pump):
         # This attribute holds an object of the type "syringe", which contains the information regarding the syringe mounted on the pump module corresponding to the pump object
         self.syringe = syringe(desig="init", inner_dia_mm=0.0, piston_stroke_mm=0.0)
 
-
-
+# TODO: Test this function
 def loadValvePositionDict(path_to_ValvePositionDict:str):
     # Open and read the file containing the data
     with open(path_to_ValvePositionDict, "r") as file:
-        rawString = file.readlines()
+        rawString = file.readlines()[0]
     # Make the rawString string to a dict
-    vPd = dict(rawString)
+    vPd = eval(rawString)
     return vPd
+
+# TODO: Test this function
+def getValvePositionDict(vPd:Union[str,dict]):
+    ''' This funciton checks the type of vPd and loads a vPd dictionary, if vPd is not yet a dictionary. '''
+    # check valvePositionDict
+    if typeCheck(vPd, dict):
+        valvePositionDict = vPd
+    elif typeCheck(vPd, str):
+        valvePositionDict = loadValvePositionDict(vPd)
+    else:
+        raise ValueError
+    return valvePositionDict
 
 class cetoni:
     def __init__(self):

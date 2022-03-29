@@ -1,4 +1,3 @@
-from driver.CetoniDevice_driver import loadValvePositionDict
 from ASAB.test.FilesForTests import config_test
 conf = config_test.config
 
@@ -7,6 +6,7 @@ import pandas as pd
 import numpy as np
 from ASAB.utility import graph
 from ASAB.utility.helpers import loadTxtFile
+from ASAB.driver.CetoniDevice_driver import loadValvePositionDict
 
 
 print("\n Test of functions in graph.py. \n")

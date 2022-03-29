@@ -4,8 +4,8 @@ try:
     from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
 except ImportError:
     # if the import was not successful, go to default config
-    from ASAB.test.FilesForTests import config_test
-    conf = config_test.config
+    from ASAB.configuration import default_config
+    conf = default_config.config
 
 from ASAB.utility.helpers import loadTxtFile, saveToFile
 

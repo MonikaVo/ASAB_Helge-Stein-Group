@@ -5,11 +5,11 @@ auxiliaryFolderHardware = "filesForOperation\\hardware"
 
 config["balanceDriver"] = {"serialPort": "<COM port>",
                     "settings": {'baudrate': 115200, 'bytesize': 8, 'parity': 'N', 'stopbits': 1, 'xonxoff': False, 'dsrdtr': False, 'rtscts': False, 'timeout': 0, 'write_timeout': None, 'inter_byte_timeout': None},
-                    "simulated": False}
+                    "simulated": True}
 
-config["balance"] = {"simulated": False}
+config["balance"] = {"simulated": True}
 
-config["CetoniDeviceDriver"] = {"availableSyringes": auxiliaryFolderHardware + "\\syringes.pck",
+config["CetoniDeviceDriver"] = {"availableSyringes": auxiliaryFolderHardware + "\\syringes.txt",
                     "configPath": experimentFolder + "...\\ASAB_Conf1", # edited prior to publication
                     "syringeConfig": {"A0.0": "10_ml", "B0.0": "10_ml", "C0.0": "2_5_ml", "D0.0": "2_5_ml", "E0.0": "1_ml", "F0.0": "1_ml"},
                     "pumps": auxiliaryFolderHardware + "\\Pumps.txt",
@@ -18,7 +18,7 @@ config["CetoniDeviceDriver"] = {"availableSyringes": auxiliaryFolderHardware + "
                     "valvePositionDict": auxiliaryFolderHardware + "\\valvePositionDict.txt",
                     "setup": auxiliaryFolderHardware + "\\setup.txt",
                     "flow": 0.03,
-                    "simulateBalance": False}
+                    "simulateBalance": True}
 
 config["CetoniDevice"] = {"waste": "Reservoir8",
                     "gas": "Reservoir7",

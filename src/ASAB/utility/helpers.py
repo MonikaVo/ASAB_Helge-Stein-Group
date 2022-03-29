@@ -14,3 +14,10 @@ def loadTxtFile(loadPath:str):
     # Evaluate the rawString
     dataEval = eval(rawString)
     return dataEval
+
+# TODO: Test this function
+def typeCheck(object, target_type):
+    ''' This function checks, if the type of the given object is the same as target type. It returns a bool value, which is True, if the types match and False otherwise. '''
+    return type(object) == target_type
+
+typeCheck("abc", dict)

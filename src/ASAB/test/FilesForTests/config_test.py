@@ -51,7 +51,7 @@ config["CetoniDevice"] = {"testInputFillSyringe": [{"pump": "A0.0", "volume": 0.
                         ['E0.0', 'E0.1', 'Ev1', 'V1.5', 'V1.0', 'V2.0', 'V2.6', 'FY2', 'FY1', 'Fv2', 'F0.1', 'F0.0']]}
 
 config["syringes"] = {"savePath": auxiliaryFolderHardware + "\\syringes_test.pck",
-                    "testInput": {"testInit": [{"designation": "a", "innerDia": 12.0, "pistonStroke": 55.0}, {"designation": "2_5_ml", "innerDia": 7.28366, "pistonStroke": 60}]}}
+                    "testInput": {"testInit": [{"designation": "a", "innerDia": 12.0, "pistonStroke": 55.0}, {"designation": "2_5_mL", "innerDia": 7.28366, "pistonStroke": 60}]}}
 
 config["graph"] = {"pathNodes": auxiliaryFolderHardware + "\\nodes_test.csv",
                     "pathEdges": auxiliaryFolderHardware + "\\edges_test.csv",

@@ -4,7 +4,6 @@ conf = config_test.config
 from ASAB.configuration import config
 cf = config.configASAB
 
-from ASAB.utility.helpers import loadFile
 from ASAB.driver import CetoniDevice_driver
 from qmixsdk import qmixbus
 
