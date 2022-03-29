@@ -2,27 +2,21 @@
 
 def saveToFile(savePath:str, data:str):
     ''' This function saves an object passed as data to a pickle file in the path given in savePath. The file must be .txt. '''
-    with open(savePath, 'w') as out_file:
+    with open(savePath, 'w', encoding='utf-8') as out_file:
        out_file.write(str(data)) # https://stackoverflow.com/questions/20101021/how-to-close-the-file-after-pickle-load-in-python
 
 def loadTxtFile(loadPath:str):
     ''' This function loads a .txt file and returns the evaluation of the content. '''
     # Open and read the file containing the data
-    with open(loadPath, "r", encoding="utf8") as file:
-        # Assuming there is only one line in the file, the element at positions zero of the list is used
-        rawString = file.readlines()[0]
+    with open(loadPath, "r", encoding='utf-8') as file:
+        rawString = file.read()
     # Evaluate the rawString
     dataEval = eval(rawString)
     return dataEval
-
-# TODO: Test this function
-def typeCheck(object, target_type):
-    ''' This function checks, if the type of the given object is the same as target type. It returns a bool value, which is True, if the types match and False otherwise. '''
-    return type(object) == target_type
 
 # TODO:Test this function
 def typeCheckDict(inputTypes:dict):
     ''' This function checks the type for several input parameters passed as a dict. It passes, if the types match and raises a ValueError, if one of the types is incorrect. '''
     for inputParam in inputTypes.keys():
-        if (not typeCheck(eval(inputParam), inputTypes[inputParam])):
+        if (not isinstance(eval(inputParam), inputTypes[inputParam])):
             raise ValueError(f'Incorrect type of {inputParam} {type(inputParam)} instead of {inputTypes[inputParam]}.')    # https://stackoverflow.com/questions/20844347/how-would-i-make-a-custom-error-message-in-python

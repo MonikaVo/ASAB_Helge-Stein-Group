@@ -17,7 +17,7 @@ def test_findClosest(testgraph=loadTxtFile(conf["CetoniDeviceDriver"]["setup"]))
     candidates = conf["graph"]["testInput"]["findClosest"]["candidates"]
     closest_target = conf["graph"]["testOutput"]["findClosest"]["closest_target"]
     
-    closest_graph, pathToClosest = graph.findClosest(graph=testgraph, node=node, candidates=candidates, weight="dead_volume", direction="in")
+    closest_graph, pathToClosest = graph.findClosest(graph=testgraph, node=node, candidates=candidates, weight="dead_volume", direction="out")
     assert(closest_target==closest_graph)
 
 def test_findPath():
@@ -108,10 +108,9 @@ def test_loadGraph():
     graph_target = graph.loadGraph(conf["CetoniDeviceDriver"]["setup"])
     vPd_target = loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"])
 
-    graph_graph, vPd_graph = graph.loadGraph(conf["CetoniDeviceDriver"]["setup"], conf["CetoniDeviceDriver"]["valvePositionDict"])
+    graph_graph= graph.loadGraph(conf["CetoniDeviceDriver"]["setup"])
     for k in nx.to_dict_of_dicts(graph_target).keys():
         assert(graph_target[k] == graph_graph[k])
-    assert(vPd_target == vPd_graph)
     # print(nx.to_dict_of_dicts(graph_target)["lambdaIN"], "\n", nx.to_dict_of_dicts(graph_graph)["lambdaIN"])   #TODO: FIX: Why are the dicts not equal, but the lists are?
     # for key in nx.to_dict_of_dicts(graph_target):
     #     print(key)
@@ -135,7 +134,7 @@ def test_getEdgedictFromNodelist(testgraph=graph.loadGraph(conf["CetoniDeviceDri
     edgeDict_target = conf["graph"]["testOutput"]["getEdgeDict"]["edgeDict_target"]
     
     edgeDict_graph = graph.getEdgedictFromNodelist(graph=testgraph, nodelist=nodelst)
-
+    print(edgeDict_graph)
     assert(edgeDict_target == edgeDict_graph)
 
 # TODO: Fix this test. Not passed due to nan != nan
@@ -194,7 +193,7 @@ def test_pathIsValid():
 
 def test_getSystemStatus(path=conf["graph"]["testInput"]["getEdgeDict"]["nodelist"], graph_path=conf["graph"]["testInput"]["getSystemStatus"]):
     # With a given path
-    setup1, _pos = graph.loadGraph(graph_path)
+    setup1 = graph.loadGraph(graph_path)
     edict = graph.getEdgedictFromNodelist(nodelist=path, graph=setup1)
     status_target1 = {}
     for edge in edict.keys():

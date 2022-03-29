@@ -12,7 +12,7 @@ cf = config.configASAB
 
 ## Imports from ASAB
 from ASAB.utility.syringes import loadSyringeDict, syringe
-from ASAB.utility.helpers import saveToFile, typeCheck
+from ASAB.utility.helpers import saveToFile
 
 # Import from QmixSDK
 import sys
@@ -80,9 +80,9 @@ def loadValvePositionDict(path_to_ValvePositionDict:str):
 def getValvePositionDict(vPd:Union[str,dict]):
     ''' This funciton checks the type of vPd and loads a vPd dictionary, if vPd is not yet a dictionary. '''
     # check valvePositionDict
-    if typeCheck(vPd, dict):
+    if isinstance(vPd, dict):
         valvePositionDict = vPd
-    elif typeCheck(vPd, str):
+    elif isinstance(vPd, str):
         valvePositionDict = loadValvePositionDict(vPd)
     else:
         raise ValueError(f'Incorrect type of {vPd} {type(vPd)} instead of str or dict.')

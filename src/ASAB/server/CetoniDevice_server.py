@@ -1,6 +1,4 @@
 ## THIS FILE SHOULD NOT BE RUN AS MAIN!!!
-from random import sample
-from re import X
 import uvicorn
 from fastapi import FastAPI, Query
 from typing import List

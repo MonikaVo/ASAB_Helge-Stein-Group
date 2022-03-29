@@ -8,8 +8,8 @@ except ImportError:
     conf = default_config.config
 
 ## Imports from ASAB
-from ASAB.utility.helpers import saveToFile, typeCheck
-from ASAB.driver.CetoniDevice_driver import getValvePositionDict, loadValvePositionDict
+from ASAB.utility.helpers import saveToFile
+from ASAB.driver.CetoniDevice_driver import getValvePositionDict
 
 ## Other imports
 from typing import Union
@@ -21,39 +21,41 @@ import numpy as np
 def loadGraph(path_to_graphDict:str=conf["CetoniDeviceDriver"]["setup"]):
     ''' This function loads a graph and the corresponding positions to allow for drawing of the graph. '''
     # Check the type of the input
-    if not typeCheck(path_to_graphDict, str):
+    if not isinstance(path_to_graphDict, str):  # https://pytutorial.com/python-check-variable-type#isinstance()-built-in-function
         raise ValueError
     # Open and read the file containing the data
-    with open(path_to_graphDict, "r") as file:
-        rawString = file.readlines()[0]
+    with open(path_to_graphDict, "r", encoding="utf-8") as file:
+        rawString = file.read()
     # Make the rawString string to a dict
     this_graph = eval(rawString)
-    graph = nx.from_dict_of_dicts(this_graph)
+    graph = nx.DiGraph(this_graph)
     # Do the same for the positions
-    with open(f"{str(path_to_graphDict[0:-4])}_positions.txt", "r") as file2:
-        rawString = file2.readlines()[0]
+    with open(f"{str(path_to_graphDict[0:-4])}_positions.txt", "r", encoding="utf-8") as file2:
+        rawString = file2.read()
     # Make the rawString string to a dict
     positions = eval(rawString)
     return graph
 
-def getGraph(graph:Union[str,nx.DiGraph]):
+def getGraph(graph:Union[str,dict,nx.classes.digraph.DiGraph]):
     ''' This function does a type check of the given graph and if it is not yet a graph object, it loads a graph object from the given file. '''
-    if typeCheck(graph, nx.DiGraph):
+    if isinstance(graph, nx.classes.digraph.DiGraph):
         graph = graph
-    elif typeCheck(graph, str):
+    elif isinstance(graph, str):
         graph = loadGraph(graph)
+    elif isinstance(graph, dict):
+        graph = nx.DiGraph(graph)
     else:
         print("graph:", type(graph))
-        raise ValueError(f'Incorrect type of {graph} {type(graph)} instead of str or nx.DiGraph.')
+        raise ValueError(f'Incorrect type of {graph} {type(graph)} instead of str, dict or nx.classes.digraph.DiGraph.')
     return graph
 
-def findClosest(node:str, candidates:list, graph:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"], weight:str="dead_volume", direction:str="out"):
+def findClosest(node:str, candidates:list, graph:Union[str,nx.classes.digraph.DiGraph]=conf["CetoniDeviceDriver"]["setup"], valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"], weight:str="dead_volume", direction:str="out"):
     ''' Finds the closest candidate to a given node regarding a specified weight for the path. The direction of the search can be either
     incoming to the node or outgoing from the node. The default is outgoing. The function returns the closest node among the given candidates
     and the path from the specified node to this candidate node. candidates is of type "list". '''
     ## Check the input types
     # check node, candidates, weight and direction
-    if (not typeCheck(node, str)) or (not typeCheck(candidates, list)) or (not typeCheck(weight, str)) or (not typeCheck(direction, str)):
+    if (not isinstance(node, str)) or (not isinstance(candidates, list)) or (not isinstance(weight, str)) or (not isinstance(direction, str)):
         raise ValueError
     # check graph
     graph = getGraph(graph)
@@ -95,7 +97,7 @@ def findPath(start_node:str, end_node:str, valvePositionDict:Union[str,dict]=con
     from start_node to end_node ''' # TODO: Add optional nodes in between and conditions for the path other than just minimal weight.
     ## Check the input types
     # check start_node, end_node, weight and direction
-    if (not typeCheck(start_node, str)) or (not typeCheck(end_node, str)) or (not typeCheck(weight, str)):
+    if (not isinstance(start_node, str)) or (not isinstance(end_node, str)) or (not isinstance(weight, str)):
         raise ValueError
     # check graph
     graph = getGraph(graph)
