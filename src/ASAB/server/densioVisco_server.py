@@ -1,5 +1,4 @@
 ## THIS FILE SHOULD NOT BE RUN AS MAIN!!!
-from random import sample
 import uvicorn
 from fastapi import FastAPI
 

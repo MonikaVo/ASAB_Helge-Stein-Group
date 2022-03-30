@@ -141,6 +141,7 @@ def test_getEdgedictFromNodelist(testgraph=graph.loadGraph(conf["CetoniDeviceDri
 def test_generateGraph(path_nodes=conf["graph"]["testInput"]["checkConsistency"]["path_nodes"], path_edges=conf["graph"]["testInput"]["checkConsistency"]["path_edges"], path_tubing=conf["graph"]["testInput"]["checkConsistency"]["path_tubing_match"], save_path=conf["graph"]["testInput"]["generateGraph"]["savePath"]):
     # Check generation of graph.
     # Generate test graph.
+    # TODO: fix edges according to new definition in target values.
     nodes = conf["graph"]["testInput"]["drawGraph"]["nodes"]
     edges = conf["graph"]["testInput"]["drawGraph"]["edges"]
     graph_target=nx.DiGraph()
