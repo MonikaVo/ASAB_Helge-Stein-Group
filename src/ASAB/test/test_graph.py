@@ -150,19 +150,18 @@ def test_generateGraph(path_nodes=conf["graph"]["testInput"]["checkConsistency"]
 
     graph_graph = graph.generateGraph(path_nodes=path_nodes, path_edges=path_edges, path_tubing=path_tubing, show=False, save=True, save_path=save_path)
     for k in nx.to_dict_of_dicts(graph_target):
-        assert(graph_target[k] == graph_graph[k])
+        assert(nx.to_dict_of_dicts(graph_target)[k] == nx.to_dict_of_dicts(graph_graph)[k])
     
     # Check positions.
     positions_target = conf["graph"]["testInput"]["drawGraph"]["testpositions"]
 
-    _G, positions_graph = graph.loadGraph(str(save_path[0:-4])+"_positions.pck")
-    assert(positions_target == positions_graph)
+    # Load the positions file
+    with open(f"{str(save_path[0:-4])}_positions.txt", "r", encoding="utf-8") as file2:
+        rawString = file2.read()
+    # Make the rawString string to a dict
+    positions_graph = eval(rawString)
 
-    dict_graph_graph = nx.to_dict_of_dicts(graph_graph)
-    graph_target, _pos_target = graph.loadGraph(save_path)
-    dict_graph_target = nx.to_dict_of_dicts(graph_target)
-    # Check that saved and loaded graph matches the generated graph for same settings.
-    assert(dict_graph_graph == dict_graph_target)
+    assert(positions_target == positions_graph)
 
 # TODO: fix this test!!!
 def test_getTotalQuantity():
@@ -205,7 +204,7 @@ def test_getSystemStatus(path=conf["graph"]["testInput"]["getEdgeDict"]["nodelis
     assert(status_target1 == status_result1)
 
     # Without a given path
-    setup2, _pos = graph.loadGraph(graph_path)
+    setup2 = graph.loadGraph(graph_path)
     nx.set_edge_attributes(G=setup2, values="new_status", name="status")   # https://networkx.org/documentation/stable/reference/generated/networkx.classes.function.set_edge_attributes.html
     status_target2 = nx.get_edge_attributes(G=setup2, name="status")
     status_result2 = graph.getSystemStatus(path=[], full=True, graph=setup2)
@@ -214,7 +213,7 @@ def test_getSystemStatus(path=conf["graph"]["testInput"]["getEdgeDict"]["nodelis
 
 
 def test_updateSystemStatus(path=conf["graph"]["testInput"]["getEdgeDict"]["nodelist"], graph_path=conf["graph"]["testInput"]["getSystemStatus"]):
-    setup, _pos = graph.loadGraph(graph_path)
+    setup  = graph.loadGraph(graph_path)
     edict = graph.getEdgedictFromNodelist(nodelist=path, graph=setup)
     
     graph.updateSystemStatus(path=path, graph=setup)

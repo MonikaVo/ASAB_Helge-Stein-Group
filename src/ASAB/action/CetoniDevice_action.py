@@ -11,7 +11,7 @@ from ASAB.configuration import config
 cf = config.configASAB
 
 ## Imports from ASAB
-from ASAB.utility.helpers import typeCheck, typeCheckDict
+from ASAB.utility.helpers import typeCheckDict
 from ASAB.driver import CetoniDevice_driver, balance_driver
 from ASAB.action import balance_action, densioVisco_action
 from ASAB.utility import graph
