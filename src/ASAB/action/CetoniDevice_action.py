@@ -225,7 +225,7 @@ def emptySyringes(pumps:dict, valves:dict, waste:str=conf["CetoniDevice"]["waste
         timer.wait_until(pumps[pump].is_pumping, False)
 
 
-def cleanMixingsystem(pumpsDict:dict, valvesDict:dict, medium1:str, intermediate:bool = True, medium2:str=conf["CetoniDevice"]["gas"], waste=conf["CetoniDevice"]["waste"], paths=conf["CetoniDevice"]["pathsToClean"], valvePositionDict:dict=CetoniDevice_driver.cetoni.loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]), setup=loadFile(conf["CetoniDeviceDriver"]["setup"]), flow:float=conf["CetoniDeviceDriver"]["flow"], repeats:int = 3):
+def cleanMixingsystem(pumpsDict:dict, valvesDict:dict, medium1:str, intermediate:bool = True, medium2:str=conf["CetoniDevice"]["gas"], waste=conf["CetoniDevice"]["waste"], paths=conf["CetoniDevice"]["pathsToClean"], valvePositionDict:dict=CetoniDevice_driver.loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]), setup=graph.loadGraph(conf["CetoniDeviceDriver"]["setup"]), flow:float=conf["CetoniDeviceDriver"]["flow"], repeats:int = 3):
     ''' This function cleans the used paths of an experiment first using solvent and subsequently using gas. It is intended to be used after small experiments, where a cleaning of the full
     system will not be reasonable. The variable intermediate determines, if it is a final cleaning after finishing experiments (False) or if it is an intermediate cleaning in between experiments (True). It requires all the tubing, which is not solvent and not gas to be put to the waste. '''
     # TODO: Test this function!!! TODO: Pump all the remainders in the pumps to one pump and again to the waste in order to reduce the remaining amount of solvent.
@@ -407,9 +407,8 @@ def cleanAll(pumpsDict:dict, valvesDict:dict, medium1:str, intermediate:bool=Tru
     goToRefPos(pumpsDict=pumpsDict, valvesDict=valvesDict, mode="end")
     return True
 
-def switchValves(nodelist:list, valvesDict:dict, settings:dict={}, valvePositionDict:dict=CetoniDevice_driver.cetoni.loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"])):
+def switchValves(nodelist:list, valvesDict:dict, settings:dict={}, valvePositionDict:dict=CetoniDevice_driver.loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"])):
     ''' This function gets the valve positions required to realize a certain path and switches the valves accordingly. '''
-    
     ## Check the input types
     inputTypes = {'nodelist':list, 'valvesDict':dict, 'settings':dict}
     typeCheckDict(inputTypes=inputTypes)
