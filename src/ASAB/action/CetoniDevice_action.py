@@ -410,7 +410,7 @@ def cleanAll(pumpsDict:dict, valvesDict:dict, medium1:str, intermediate:bool=Tru
 def switchValves(nodelist:list, valvesDict:dict, settings:dict={}, valvePositionDict:dict=CetoniDevice_driver.loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"])):
     ''' This function gets the valve positions required to realize a certain path and switches the valves accordingly. '''
     ## Check the input types
-    inputTypes = {'nodelist':list, 'valvesDict':dict, 'settings':dict}
+    #inputTypes = {'nodelist':list, 'valvesDict':dict, 'settings':dict}  # TODO: Fix this type check!
     typeCheckDict(inputTypes=inputTypes)
     # check valvePositionDict
     valvePositionDict = getValvePositionDict(vPd=valvePositionDict)

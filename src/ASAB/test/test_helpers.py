@@ -15,7 +15,7 @@ def test_saveToFile():
     with open (r"FilesForTests\test_save.txt", "r") as file:
         loaded_save = file.readlines()[0]
     dict_loaded = eval(loaded_save)
-    assert(testDict_save == dict_loaded)
+    assert testDict_save == dict_loaded
 
 def test_loadTxtFile():
     # Use helper function to load and evaluate
@@ -24,4 +24,4 @@ def test_loadTxtFile():
     with open (r"FilesForTests\test_save.txt", "r") as file: # edited prior to publication
         loaded_save = file.readlines()[0]
     read = eval(loaded_save)
-    assert(read == withHelper)
+    assert read == withHelper

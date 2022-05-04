@@ -37,7 +37,7 @@ def test_switchValves():
     valves_after = CetoniDevice_driver.cetoni.getValvePositions(valvesDict=Vs, valvePositionDict=CetoniDevice_driver.loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]))
     valves_target = conf["CetoniDevice"]["testInputFillSyringe"][i]["valvePos"]
 
-    assert(valves_after == valves_target, "The valve settings after switching are not as expected.")
+    assert valves_after == valves_target, "The valve settings after switching are not as expected."
     CetoniDevice_driver.cetoni.quitCetoni()
 
 # def test_fillSyringe():

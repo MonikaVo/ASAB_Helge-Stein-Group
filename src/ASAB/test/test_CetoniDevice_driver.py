@@ -17,9 +17,9 @@ def attributeComp(result, target):
         for attribute in attr:  # https://stackoverflow.com/questions/31368056/get-all-attributes-of-a-class-in-python#31368099
             if attribute in vars(target[key]):
                 if attribute in vars(target[key]):
-                    assert(getattr(target[key], attribute) == getattr(result[key], attribute))    # https://stackoverflow.com/questions/2157035/accessing-an-attribute-using-a-variable-in-python
+                    assert getattr(target[key], attribute) == getattr(result[key], attribute)    # https://stackoverflow.com/questions/2157035/accessing-an-attribute-using-a-variable-in-python
                 else:
-                    assert(1 == 0)
+                    assert 1 == 0
 
 #TODO_ Generate new reference objects for pumps, valves and channels
 # def test_prepareCetoni():
@@ -67,7 +67,7 @@ def test_getValvePositions():
         Vs[v].switch_valve_to_position(i)
         check[v] = i
         i+=1
-    assert(CetoniDevice_driver.cetoni.getValvePositions(valvesDict=Vs, valvePositionDict=vPd) == check, f"Valve positions do not match.")
+    assert CetoniDevice_driver.cetoni.getValvePositions(valvesDict=Vs, valvePositionDict=vPd) == check, f"Valve positions do not match."
 
     qmixbus.Bus.stop()
     qmixbus.Bus.close()
@@ -80,7 +80,9 @@ def test_valve__init__():
         if func[0:2] != "__":
             funcs.append(func)
 
-    assert(funcs == conf["CetoniDeviceDriver"]["outputTarget"]["valveInit"]["target"], f"Attributes and methods do not match.")
+    print(funcs)
+
+    assert funcs == conf["CetoniDeviceDriver"]["outputTarget"]["valveInit"]["target"], f"Attributes and methods do not match."
 
 def test_pump__init__():
     pum = CetoniDevice_driver.pumpObj()
@@ -90,4 +92,4 @@ def test_pump__init__():
         if func[0:2] != "__":
             funcs.append(func)
 
-    assert(funcs == conf["CetoniDeviceDriver"]["outputTarget"]["pumpInit"]["target"], f"Attributes and methods do not match.")
+    assert funcs == conf["CetoniDeviceDriver"]["outputTarget"]["pumpInit"]["target"], f"Attributes and methods do not match."

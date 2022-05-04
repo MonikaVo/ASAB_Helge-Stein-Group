@@ -9,5 +9,5 @@ def test_readBalance():
     reading_result = balance2.readBalance()
     reading_target = balance2.port.target
 
-    assert(reading_target==reading_result)
+    assert reading_target==reading_result
     #assertEqual(first=reading_target, second=reading_result, msg="Readings do not match.")

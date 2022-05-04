@@ -18,7 +18,7 @@ def test_findClosest(testgraph=loadTxtFile(conf["CetoniDeviceDriver"]["setup"]))
     closest_target = conf["graph"]["testOutput"]["findClosest"]["closest_target"]
     
     closest_graph, pathToClosest = graph.findClosest(graph=testgraph, node=node, candidates=candidates, weight="dead_volume", direction="out")
-    assert(closest_target==closest_graph)
+    assert closest_target==closest_graph
 
 def test_findPath():
     path_target = conf["graph"]["testInput"]["getEdgeDict"]["nodelist"]
@@ -27,9 +27,9 @@ def test_findPath():
     path_result = graph.findPath(start_node=path_target[0], end_node=path_target[-1], valvePositionDict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]), graph=graph.loadGraph(conf["CetoniDeviceDriver"]["setup"]))
     pathValidity_result = graph.pathIsValid(path=path_result, valvePositionDict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]))
 
-    assert(path_target == path_result)
-    assert(pathValidity_target == True)
-    assert(pathValidity_result == True)
+    assert path_target == path_result
+    assert pathValidity_target == True
+    assert pathValidity_result == True
 
 def test_checkConsistency(path_nodes=conf["graph"]["testInput"]["checkConsistency"]["path_nodes"], path_edges=conf["graph"]["testInput"]["checkConsistency"]["path_edges"], path_tubing_match=conf["graph"]["testInput"]["checkConsistency"]["path_tubing_match"], path_tubing_newEdge=conf["graph"]["testInput"]["checkConsistency"]["path_tubing_newEdge"]):
     edges = pd.read_csv(path_edges, sep=";")
@@ -45,12 +45,12 @@ def test_checkConsistency(path_nodes=conf["graph"]["testInput"]["checkConsistenc
 
     total_graph, tube_edge_graph, tube_node_graph = graph.checkConsistency(path_nodes, path_edges, path_tubing_match)
 
-    assert(tube_edge_ref == tube_edge_graph)
-    assert(tube_node_ref == tube_node_graph)
-    assert(total_ref == total_graph)
+    assert tube_edge_ref == tube_edge_graph
+    assert tube_node_ref == tube_node_graph
+    assert total_ref == total_graph
     results = [tube_edge_ref, tube_edge_graph, tube_node_ref, tube_node_graph, total_ref, total_graph]
     for res in results:
-        assert(type(res) == bool)
+        assert type(res) == bool
 
     # New entry
     tubing = pd.read_csv(path_tubing_newEdge, sep=";")
@@ -62,22 +62,22 @@ def test_checkConsistency(path_nodes=conf["graph"]["testInput"]["checkConsistenc
 
     total_graph, tube_edge_graph, tube_node_graph = graph.checkConsistency(path_nodes, path_edges, path_tubing_newEdge)
 
-    assert(2 == len(tube_node_graph))
-    assert(total_ref == total_graph)
-    assert(len(tube_edge_graph) == 1)
-    assert(list(tube_edge_graph) == ["0253-DD-s"])
+    assert 2 == len(tube_node_graph)
+    assert total_ref == total_graph
+    assert len(tube_edge_graph) == 1
+    assert list(tube_edge_graph) == ["0253-DD-s"]
 
 def test_appendEdge(edge_name="0286-NT-1", edgeNodes=pd.read_csv(conf["graph"]["testInput"]["checkConsistency"]["path_tubing_match"], sep=";"), edgeProps=pd.read_csv(conf["graph"]["testInput"]["checkConsistency"]["path_edges"], sep=";")):
     # Directed edge (not adding both directions)
     target_directed_edgelst = [("Ev1", "V1.5", {"name": "0286-NT-1", "designation": ("Ev1", "V1.5"), "ends": "NT", "length": float(286), "diameter": float(0.3), "dead_volume": float(0.0202), "status": "empty"})]
     edgelst1 = []
     graph.appendEdge(edgelst1, edge_name, edgeNodes, edgeProps, reverse=False)
-    assert(target_directed_edgelst == edgelst1)
+    assert target_directed_edgelst == edgelst1
     # Undirected edge (adding both directions)
     target_undirected_edgelst = [("Ev1", "V1.5", {"name": "0286-NT-1", "designation": ("Ev1", "V1.5"), "ends": "NT", "length": float(286), "diameter": float(0.3), "dead_volume": float(0.0202), "status": "empty"}), ("V1.5", "Ev1", {"name": "0286-NT-1", "designation": ("V1.5", "Ev1"), "ends": "NT", "length": float(286), "diameter": float(0.3), "dead_volume": float(0.0202), "status": "empty"})]
     edgelst2 = []
     graph.appendEdge(edgelst2, edge_name, edgeNodes, edgeProps, reverse=True)
-    assert(target_undirected_edgelst == edgelst2)
+    assert target_undirected_edgelst == edgelst2
 
 def test_drawGraph():
     # Generate test graph.
@@ -110,7 +110,7 @@ def test_loadGraph():
 
     graph_graph= graph.loadGraph(conf["CetoniDeviceDriver"]["setup"])
     for k in nx.to_dict_of_dicts(graph_target).keys():
-        assert(graph_target[k] == graph_graph[k])
+        assert graph_target[k] == graph_graph[k]
     # print(nx.to_dict_of_dicts(graph_target)["lambdaIN"], "\n", nx.to_dict_of_dicts(graph_graph)["lambdaIN"])   #TODO: FIX: Why are the dicts not equal, but the lists are?
     # for key in nx.to_dict_of_dicts(graph_target):
     #     print(key)
@@ -127,7 +127,7 @@ def test_getValveFromName():
         valve = graph.getValveFromName(node_name=name, valvePositionDict=loadValvePositionDict(conf["graph"]["testInput"]["generateValvePositionDict"]["savePath"]))
         valves_result.append(valve)
 
-    assert(valves_target == valves_result)
+    assert valves_target == valves_result
 
 def test_getEdgedictFromNodelist(testgraph=graph.loadGraph(conf["CetoniDeviceDriver"]["setup"])):
     nodelst = conf["graph"]["testInput"]["getEdgeDict"]["nodelist"]
@@ -135,7 +135,7 @@ def test_getEdgedictFromNodelist(testgraph=graph.loadGraph(conf["CetoniDeviceDri
     
     edgeDict_graph = graph.getEdgedictFromNodelist(graph=testgraph, nodelist=nodelst)
     print(edgeDict_graph)
-    assert(edgeDict_target == edgeDict_graph)
+    assert edgeDict_target == edgeDict_graph
 
 # TODO: Fix this test. Not passed due to nan != nan
 def test_generateGraph(path_nodes=conf["graph"]["testInput"]["checkConsistency"]["path_nodes"], path_edges=conf["graph"]["testInput"]["checkConsistency"]["path_edges"], path_tubing=conf["graph"]["testInput"]["checkConsistency"]["path_tubing_match"], save_path=conf["graph"]["testInput"]["generateGraph"]["savePath"]):
@@ -150,7 +150,7 @@ def test_generateGraph(path_nodes=conf["graph"]["testInput"]["checkConsistency"]
 
     graph_graph = graph.generateGraph(path_nodes=path_nodes, path_edges=path_edges, path_tubing=path_tubing, show=False, save=True, save_path=save_path)
     for k in nx.to_dict_of_dicts(graph_target):
-        assert(nx.to_dict_of_dicts(graph_target)[k] == nx.to_dict_of_dicts(graph_graph)[k])
+        assert nx.to_dict_of_dicts(graph_target)[k] == nx.to_dict_of_dicts(graph_graph)[k]
     
     # Check positions.
     positions_target = conf["graph"]["testInput"]["drawGraph"]["testpositions"]
@@ -161,14 +161,13 @@ def test_generateGraph(path_nodes=conf["graph"]["testInput"]["checkConsistency"]
     # Make the rawString string to a dict
     positions_graph = eval(rawString)
 
-    assert(positions_target == positions_graph)
+    assert positions_target == positions_graph
 
-# TODO: fix this test!!!
 def test_getTotalQuantity():
     nodelst = conf["graph"]["testInput"]["getEdgeDict"]["nodelist"]
     dead_volume_total_target = 0.1807
     dead_volume_total_graph = graph.getTotalQuantity(nodelist=nodelst, quantity="dead_volume")
-    assert(np.isclose(dead_volume_total_target, dead_volume_total_graph, 0.00001))
+    assert np.isclose(dead_volume_total_target, dead_volume_total_graph, 0.00001)
 
 def test_getValveSettings():
     nodelst = conf["graph"]["testInput"]["getEdgeDict"]["nodelist"]
@@ -177,7 +176,7 @@ def test_getValveSettings():
     valveSettings_target = {"Av": 1, "V1": 0, "V2": 6, "V3": 0}
     valveSettings_graph = graph.getValveSettings(nodelst, vPd)
 
-    assert(valveSettings_target == valveSettings_graph)
+    assert valveSettings_target == valveSettings_graph
 
 def test_pathIsValid():
         path_wrong = conf["graph"]["testInput"]["pathIsValid"]["path"]["wrong"]
@@ -188,8 +187,8 @@ def test_pathIsValid():
         pathValidityCorrect_target = True
         pathValidityCorrect_result = graph.pathIsValid(path=path_correct, valvePositionDict=loadValvePositionDict(conf["graph"]["testInput"]["generateValvePositionDict"]["savePath"]))
 
-        assert(pathValidityWrong_target == pathValidityWrong_result)
-        assert(pathValidityCorrect_target == pathValidityCorrect_result)
+        assert pathValidityWrong_target == pathValidityWrong_result
+        assert pathValidityCorrect_target == pathValidityCorrect_result
 
 def test_getSystemStatus(path=conf["graph"]["testInput"]["getEdgeDict"]["nodelist"], graph_path=conf["graph"]["testInput"]["getSystemStatus"]):
     # With a given path
@@ -201,7 +200,7 @@ def test_getSystemStatus(path=conf["graph"]["testInput"]["getEdgeDict"]["nodelis
         status_target1[edict[edge]["designation"]] = "A0.0"
     status_result1 = graph.getSystemStatus(path=path, full=False, graph=setup1)
     
-    assert(status_target1 == status_result1)
+    assert status_target1 == status_result1
 
     # Without a given path
     setup2 = graph.loadGraph(graph_path)
@@ -209,7 +208,7 @@ def test_getSystemStatus(path=conf["graph"]["testInput"]["getEdgeDict"]["nodelis
     status_target2 = nx.get_edge_attributes(G=setup2, name="status")
     status_result2 = graph.getSystemStatus(path=[], full=True, graph=setup2)
 
-    assert(status_target2 == status_result2)
+    assert status_target2 == status_result2
 
 
 def test_updateSystemStatus(path=conf["graph"]["testInput"]["getEdgeDict"]["nodelist"], graph_path=conf["graph"]["testInput"]["getSystemStatus"]):
@@ -223,4 +222,4 @@ def test_updateSystemStatus(path=conf["graph"]["testInput"]["getEdgeDict"]["node
     for edge in edict.keys():
         status_target[edict[edge]["designation"]] = "A0.0"
 
-    assert(status_target == status_result)
+    assert status_target == status_result

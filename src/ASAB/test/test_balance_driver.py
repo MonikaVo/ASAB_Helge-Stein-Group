@@ -12,8 +12,8 @@ def test___init__():
     port_result = balance1.port.port
     settings_result = balance1.port.get_settings()
 
-    assert(port_target == port_result)
-    assert(settings_target == settings_result)
+    assert port_target == port_result
+    assert settings_target == settings_result
 
 
 
@@ -23,4 +23,4 @@ def test_readBalance():
     reading_result = balance2.readBalance()
     reading_target = balance2.port.target
 
-    assert(reading_target == reading_result)
+    assert reading_target == reading_result
