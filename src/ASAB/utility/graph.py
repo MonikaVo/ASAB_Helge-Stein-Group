@@ -91,10 +91,10 @@ def findClosest(node:str, candidates:list, graph:Union[str,nx.classes.digraph.Di
     pathToClosest = eval(shortest_distances.loc[shortest_distances["candidate"]==closest, "shortestPath"].values[0])
     return closest, pathToClosest
 
-def findPath(start_node:str, end_node:str, valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"], graph:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], weight:str="dead_volume"):
+def findPathAB(start_node:str, end_node:str, valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"], graph:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], weight:str="dead_volume"):
     ''' This function finds a path in the graph representing the setup. It uses the function "pathIsValid" to makes sure that no more than two nodes belonging to the same valve are included
     in the path. If this condition is not met by the suggestion obtained by the Dijkstra algorithm, it removes connections in a copy of the graph until it finds a valid path. The path is searched
-    from start_node to end_node ''' # TODO: Add optional nodes in between and conditions for the path other than just minimal weight.
+    from start_node to end_node. ''' # TODO: Add optional nodes in between and conditions for the path other than just minimal weight.
     ## Check the input types
     # check start_node, end_node, weight and direction
     if (not isinstance(start_node, str)) or (not isinstance(end_node, str)) or (not isinstance(weight, str)):
@@ -162,6 +162,36 @@ def findPath(start_node:str, end_node:str, valvePositionDict:Union[str,dict]=con
         # Get the path of the optimum valid path
         selected_path = selection.get("new_path").array[0]
         return selected_path
+
+# TODO: Test this function
+def findPath(start_node:str, end_node:str, valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"], graph:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], weight:str="dead_volume", *args):
+    ''' This function finds a path from the start node to the end node and if applicable passes the nodes given as *args in the sequence given. '''
+    ## If no additional nodes to pass are given, search for a path between start_node and end_node.
+    # check, if no additional nodes are given
+    if list(args) == []:
+        # call the function, which finds a path from start_node to end_node and return its result
+        return findPathAB(start_node=start_node, end_node=end_node, valvePositionDict=valvePositionDict, graph=graph, weight=weight)
+    else:
+        ## If there are additional nodes, find a path to pass them all in the given order
+        # add the start_node to the beginning of the list and the end_node to the end of the list
+        nodesToPass = [start_node] + list(args) + [end_node]
+        # prepare a list to save the total path
+        totalPath = []
+        ## Find a path from each node in the list of nodes to pass to its successor and assemble the paths to the total path
+        # iterate over all nodes that need to be passed
+        for i in (len(nodesToPass) - 1):
+            # get the path from this node to its successor
+            path = findPathAB(start_node=nodesToPass[i], end_node=nodesToPass[i+1], valvePositionDict=valvePositionDict, graph=graph, weight=weight)
+            # add this path to the total path omitting its end node
+            totalPath.extend(path[:-1]) # https://stackoverflow.com/questions/252703/what-is-the-difference-between-pythons-list-methods-append-and-extend 
+        # add the final end_node to the total Path, because it is omitted in the for-loop
+        totalPath.extend(end_node)
+        ## Return the path, if it is valid
+        if pathIsValid(totalPath):
+            return totalPath
+        # else raise a ValueError
+        else:
+            raise ValueError('No path is found, which passes all the nodes in the given order. Please check the requirements.')
 
 # TODO: Add comments
 def checkConsistency(path_nodes:str=conf["graph"]["pathNodes"], path_edges:str=conf["graph"]["pathEdges"], path_tubing:str=conf["graph"]["pathTubing"]):
