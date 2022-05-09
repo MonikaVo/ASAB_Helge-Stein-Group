@@ -162,7 +162,7 @@ def findPathAB(start_node:str, end_node:str, valvePositionDict:Union[str,dict]=c
         # Among the valid paths select the one with minimum weight and subsequently the one with minimum valveCount.
         fineSelection = selection.loc[selection["total_weight"]==np.min(selection["total_weight"])]
         fineSelection = fineSelection.loc[selection["valveCount"]==np.min(selection["valveCount"])]
-        # Get the path of the optimum valid path
+        # Get the path of one of the optimum valid paths
         selected_path = fineSelection.get("new_path").array[0]
         return selected_path
 
