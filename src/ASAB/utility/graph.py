@@ -157,35 +157,39 @@ def findPathAB(start_node:str, end_node:str, valvePositionDict:Union[str,dict]=c
                         candidate.columns=["removed_edge", "new_graph", "new_path", "total_weight", "validity", "valveCount"]
                         # Add the new candidate to the candidate_graphs dataframe
                         candidate_graphs = pd.concat([candidate_graphs, candidate], axis=0, ignore_index=True)
-        # Select the row in the dataframe, which contains a valid path with minimum weight and minimum valveCount.
-        selection = candidate_graphs.loc[(candidate_graphs["validity"]==True) & (candidate_graphs["total_weight"]==np.min(candidate_graphs["total_weight"])) & (candidate_graphs["valveCount"]==np.min(candidate_graphs["valveCount"]))]
+        # Select the row in the dataframe, which contains a valid path.
+        selection = candidate_graphs.loc[(candidate_graphs["validity"]==True)]
+        # Among the valid paths select the one with minimum weight and subsequently the one with minimum valveCount.
+        fineSelection = selection.loc[selection["total_weight"]==np.min(selection["total_weight"])]
+        fineSelection = fineSelection.loc[selection["valveCount"]==np.min(selection["valveCount"])]
         # Get the path of the optimum valid path
-        selected_path = selection.get("new_path").array[0]
+        selected_path = fineSelection.get("new_path").array[0]
         return selected_path
 
 # TODO: Test this function
-def findPath(start_node:str, end_node:str, valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"], graph:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], weight:str="dead_volume", *args):
-    ''' This function finds a path from the start node to the end node and if applicable passes the nodes given as *args in the sequence given. '''
+def findPath(start_node:str, end_node:str, via:list=[], valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"], graph:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], weight:str="dead_volume"):
+    ''' This function finds a path from the start node to the end node and if applicable passes the nodes given as a list in 'via' in the sequence given. '''
     ## If no additional nodes to pass are given, search for a path between start_node and end_node.
     # check, if no additional nodes are given
-    if list(args) == []:
+    if via == []:
         # call the function, which finds a path from start_node to end_node and return its result
         return findPathAB(start_node=start_node, end_node=end_node, valvePositionDict=valvePositionDict, graph=graph, weight=weight)
     else:
         ## If there are additional nodes, find a path to pass them all in the given order
         # add the start_node to the beginning of the list and the end_node to the end of the list
-        nodesToPass = [start_node] + list(args) + [end_node]
+        nodesToPass = [start_node] + via + [end_node]
         # prepare a list to save the total path
         totalPath = []
         ## Find a path from each node in the list of nodes to pass to its successor and assemble the paths to the total path
         # iterate over all nodes that need to be passed
-        for i in (len(nodesToPass) - 1):
+        for i in range((len(nodesToPass) - 1)):
+            print(nodesToPass[i],nodesToPass[i+1])
             # get the path from this node to its successor
             path = findPathAB(start_node=nodesToPass[i], end_node=nodesToPass[i+1], valvePositionDict=valvePositionDict, graph=graph, weight=weight)
             # add this path to the total path omitting its end node
             totalPath.extend(path[:-1]) # https://stackoverflow.com/questions/252703/what-is-the-difference-between-pythons-list-methods-append-and-extend 
         # add the final end_node to the total Path, because it is omitted in the for-loop
-        totalPath.extend(end_node)
+        totalPath.append(end_node)
         ## Return the path, if it is valid
         if pathIsValid(totalPath):
             return totalPath
