@@ -488,9 +488,9 @@ def fillSyringe(pump:pumpObj, volume:float, valvesDict:dict, reservoir:str, wast
     print(new_level)
     
 
-    # FIXME: Not valid for the general case. Only for checkDefinition application
-    if new_level < 0:
-        new_level = currentVol
+    # # FIXME: Not valid for the general case. Only for checkDefinition application
+    # if new_level < 0:
+    #     new_level = currentVol
 
 
 
