@@ -92,7 +92,7 @@ class cetoni:
     def __init__(self):
         pass
         
-    def prepareCetoni(config_path:str=conf["CetoniDeviceDriver"]["configPath"], QmixSDK_path:str=cf["QmixSDK"], available_syringes:str=conf["CetoniDeviceDriver"]["availableSyringes"], syringe_config:dict=conf["CetoniDeviceDriver"]["syringeConfig"], save_name_VdP=conf["CetoniDeviceDriver"]["valvePositionDict"], save_name_pumps=conf["CetoniDeviceDriver"]["pumps"], save_name_valves=conf["CetoniDeviceDriver"]["valves"], save_name_channels=conf["CetoniDeviceDriver"]["channels"]):
+    def prepareCetoni(config_path:str=conf["CetoniDeviceDriver"]["configPath"], QmixSDK_path:str=cf["QmixSDK"], available_syringes:str=conf["CetoniDeviceDriver"]["availableSyringes"], syringe_config:dict=conf["CetoniDeviceDriver"]["syringeConfig"], save_name_VdP=conf["CetoniDeviceDriver"]["valvePositionDict"]): #, save_name_pumps=conf["CetoniDeviceDriver"]["pumps"]): #, save_name_valves=conf["CetoniDeviceDriver"]["valves"], save_name_channels=conf["CetoniDeviceDriver"]["channels"]):
         ''' This function sets the Cetoni setup operable. It takes the path for the relevant configuration file and the path to the QmixSDK module
         as inputs, prints the detected setup, configures the syringes and returns one dict containing the pumps ("Pumps") and one containing the valves ("Valves"). '''
         
@@ -148,7 +148,7 @@ class cetoni:
                 # Add an entry for the respective valve to the valvePositionDict
                 valvePositionDict[Valve_designation] = {}
                 # Go through the number of valve positions for a QmixV valve, which is 10
-                for i in range(0,11):
+                for i in range(1,Valve.number_of_valve_positions()+1):    #0,11): Changed to make the code more flexible regarding valves.
                     # Assemble the key for the respective port of the valve
                     key = f"{Valve_designation}.{i}"
                     # Generate an entry for the port of the valve, which is 1 below i in order to get the index of the position for the API.
@@ -165,7 +165,7 @@ class cetoni:
                         # The valves on pump modules have two positions related to a port. Iterate over these. Further positions of these valves do not correspond to a port.
                         for z in [0,1]:
                             # Assemble the key for the respective port of the valve
-                            key2 = f"{Valve_designation}{z}"
+                            key2 = f"{Valve_designation}.{z}"
                             # Generate an entry for the port of the valve, which is 1 for designation 1 and 0 for deignation 0.
                             valvePositionDict[Valve_designation][key2] = z
                 Valves[Valve_designation] = Valve
@@ -237,8 +237,10 @@ class cetoni:
         qmixbus.Bus.close()
         '''----------------Finishing end----------------'''
 
-    def getValvePositions(valvesDict:dict, valvePositionDict:dict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"])):
-        ''' This function returns the positions of all valves in the system in a dictionary. The designations of the valves are the keys. '''
+    def getValvePositions(valvesDict:dict, valvePositionDict:str=conf["CetoniDeviceDriver"]["valvePositionDict"]):
+        ''' This function returns the positions of all valves in the system in a dictionary. The designations of the valves are the keys.
+        It takes the dicts of valves and the path to the valvePositionDict as inputs. '''
+        valvePositionDict = loadValvePositionDict(vPd=valvePositionDict)
         valvePos = {}
         for valve in valvePositionDict.keys():
             # Write the current valve position for each valve in the dict "valvePos"

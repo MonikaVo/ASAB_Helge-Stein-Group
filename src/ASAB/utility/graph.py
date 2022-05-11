@@ -355,15 +355,37 @@ def getValveSettings(nodelist:list, valvePositionDict:Union[str,dict]=conf["Ceto
     valvePositionDict = getValvePositionDict(valvePositionDict)
 
     valveSettings = {}
+    # Go through all nodes in the nodelist
     for node in nodelist:
-        valve = node[0:2]
-        if valve in valvePositionDict.keys():
-            if (valve in valveSettings.keys()) and (node[-2::] != ".0"):
-                print("This path is not valid, because it passes the same valve multiple times.")
-            elif node[-2::] != ".0":
-                valveSettings[valve] = valvePositionDict[valve][node]
-            elif node[-2::] == ".0":
-                pass
+        # split the node at the '.' to separate the valve designation from the position
+        valve_pos = node.split('.')
+        # if the list after the split has two elements,
+        if len(valve_pos) == 2:
+            # the valve is the first element
+            valve = valve_pos[0]
+            # the position is the second element
+            pos = valve_pos[1]
+            # if the valve is in the keys of the valvePositionDict, (this excludes nodes, which are not valves)
+            if valve in valvePositionDict.keys():
+                # if the valve is already included in the valve settings and the position is not 0
+                if (valve in valveSettings.keys()) and (pos != "0"):
+                    # the valve is passed a second time, which leads to an invalid path -> message
+                    print("This path is not valid, because it passes the same valve multiple times.")
+                # if the position is non-zero,
+                elif pos != "0":
+                    # add the position to the valve settings for the respective valve
+                    valveSettings[valve] = valvePositionDict[valve][node]
+                # if the position is zero, but not for a rotary valve,
+                elif ('V' not in valve) and (pos == '0'):
+                    # add the position to the valve settings for the respective valve
+                    valveSettings[valve] = valvePositionDict[valve][node]
+                # if the valve is a rotary valve and the position is zero, skip it
+                elif ('V' in valve) and (pos == "0"):
+                    pass
+        # if the length of valve_pos is not two, skip this node, because it is not a valve with a position
+        else:
+            pass
+    # return the valve settings
     return valveSettings
 
 def pathIsValid(path:list, valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"]):

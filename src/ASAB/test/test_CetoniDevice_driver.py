@@ -21,7 +21,7 @@ def attributeComp(result, target):
                 else:
                     assert 1 == 0
 
-#TODO_ Generate new reference objects for pumps, valves and channels
+# #TODO_ Generate new reference objects for pumps, valves and channels
 # def test_prepareCetoni():
 #     Pumps_target = loadFile(conf["CetoniDeviceDriver"]["pumps"])
 #     Valves_target = loadFile(conf["CetoniDeviceDriver"]["valves"])
@@ -58,7 +58,7 @@ def test_quitCetoni():
     # TODO: Find a way to check if the bus communication is closed.
 
 def test_getValvePositions():
-    Vs = CetoniDevice_driver.cetoni.prepareCetoni(config_path=conf["CetoniDeviceDriver"]["configPath"], QmixSDK_path=cf["QmixSDK"], available_syringes=conf["CetoniDeviceDriver"]["availableSyringes"], syringe_config=conf["CetoniDeviceDriver"]["syringeConfig"], save_name_VdP=conf["CetoniDeviceDriver"]["valvePositionDict"], save_name_pumps=conf["CetoniDeviceDriver"]["pumps"], save_name_valves=conf["CetoniDeviceDriver"]["valves"], save_name_channels=conf["CetoniDeviceDriver"]["channels"])[1]
+    Vs = CetoniDevice_driver.cetoni.prepareCetoni(config_path=conf["CetoniDeviceDriver"]["configPath"], QmixSDK_path=cf["QmixSDK"], available_syringes=conf["CetoniDeviceDriver"]["availableSyringes"], syringe_config=conf["CetoniDeviceDriver"]["syringeConfig"], save_name_VdP=conf["CetoniDeviceDriver"]["valvePositionDict"])[1]
     vPd = CetoniDevice_driver.getValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"])
 
     check = {}
