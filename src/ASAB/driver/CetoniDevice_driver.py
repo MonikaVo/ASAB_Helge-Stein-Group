@@ -163,11 +163,11 @@ class cetoni:
                         # Generate an entry for the respective valve in the valvePositionDict
                         valvePositionDict[Valve_designation] = {}
                         # The valves on pump modules have two positions related to a port. Iterate over these. Further positions of these valves do not correspond to a port.
-                        for z in [1,2]:
+                        for z in [0,1]:
                             # Assemble the key for the respective port of the valve
                             key2 = f"{Valve_designation}{z}"
-                            # Generate an entry for the port of the valve, which is 1 for designation 1 and 0 for deignation 2.
-                            valvePositionDict[Valve_designation][key2] = 1 if z==1 else 0
+                            # Generate an entry for the port of the valve, which is 1 for designation 1 and 0 for deignation 0.
+                            valvePositionDict[Valve_designation][key2] = z
                 Valves[Valve_designation] = Valve
             else:
                 # Print an info, if the valve is neither a QmixV valve nor a pump valve
