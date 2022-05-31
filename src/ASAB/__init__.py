@@ -9,6 +9,3 @@ if configASAB["QmixSDK_python"] not in sys.path:
     sys.path.append(configASAB["QmixSDK_python"])
 if configASAB["QmixSDK"] not in sys.path:
     sys.path.append(configASAB["QmixSDK"])
-
-# # Set the current working directory to ASAB.
-# os.chdir(configASAB["ASAB"])
