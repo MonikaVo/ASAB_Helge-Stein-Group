@@ -2,17 +2,15 @@
 import uvicorn
 from fastapi import FastAPI, Query, Body
 from typing import List, Dict
-import initASAB_SWenv
 
-from utility import graph
-from driver import CetoniDevice_driver
-from action import CetoniDevice_action
+from ASAB.utility import graph
+from ASAB.driver import CetoniDevice_driver
+from ASAB.action import CetoniDevice_action
 
 try:
     from __main__ import conf, Ps, Vs, Cs   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
 except ImportError:
-    from experiments.Hackathon import config_Hackathon
-    conf = config_Hackathon.config
+    from config_Hackathon import config as conf
 
 app = FastAPI(title="CetoniDevice server V1.0",
             description="This server offers interfaces to use the CetoniDevice functionalities.",
@@ -21,17 +19,10 @@ app = FastAPI(title="CetoniDevice server V1.0",
 @app.get("/action/CetoniDevice_action/mix")
 def mix(compounds: List[str] = Query([]), ratios: List[float] = Query([])):
     print("mix")
-    # mixrat = dict(zip(compounds, ratios))
-    # assignment = conf["CetoniDevice"]["assignment"]
-    # compoundsReservoirs = conf["CetoniDevice"]["compoundsReservoirs"]
-    # mixRatio = dict([(compoundsReservoirs[compound], mixrat[compound]) for compound in mixrat.keys()])
-    # print(mixRatio)
-    # CetoniDevice_action.mix(mixRatio=mixRatio, assignment=assignment, pumps=Ps, valves=Vs)
 
 @app.get("/action/CetoniDevice_action/provideSample")
 def provideSample(measurementtype:str, sample_node:str):
     print("provide")
-    #CetoniDevice_action.provideSample(measurementtype=measurementtype, sample_node=sample_node, pumps=Ps, valves=Vs)
 
 @app.on_event("shutdown")
 def quitCetoni():

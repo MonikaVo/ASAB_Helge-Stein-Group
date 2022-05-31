@@ -727,14 +727,12 @@ def goToRefPos(pumpsDict:dict, valvesDict:dict, mode:str, gas:str=conf["CetoniDe
         try:
             if mode == "end":
                 level = np.min([2.0, pumpsDict[p].get_volume_max()/2.])
-                print(level)
                 path = graph.findPath(gas, p)
-                print(path)
             elif mode == "start":
                 level = 0.0
                 path = graph.findPath(p, waste)
             switchValves(path, valvesDict=valvesDict)
             pumpsDict[p].set_fill_level(level, pumpsDict[p].get_flow_rate_max()/5.)
-            timer.wait_until(pumpsDict[p].is_pumping, False)
+            timer.wait_until(pumpsDict[p].is_pumping, False)    # TODO: consider removing this from the loop and only wait for the last pump, as now each pump has its own waste and gas line
         except (NodeNotFound, NetworkXNoPath) as e:
             pass

@@ -3,6 +3,7 @@ try:
     # if there is a main file, get conf from there
     from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
 except ImportError:
+    print('Import from __main__ failed!')
     # if the import was not successful, go to default config
     from ASAB.configuration import default_config
     conf = default_config.config
@@ -142,7 +143,10 @@ class cetoni:
             Valve.lookup_by_device_index(v)
             # Assign a shorter name to the valve, names differ between Qmix valve valves and pump valves
             if Valve.get_device_name().__contains__("QmixV"):
-                Valve_designation = "V{}".format(int(v)+1)
+                # Get the number of the valve to assign it correctly to the new designation
+                valveNumber = Valve.get_device_name().split('_')[1]
+                # Generate the valve designation
+                Valve_designation = "V{}".format(int(valveNumber))
                 # Add the valve to the valves dictionary
                 Valves[Valve_designation] = Valve
                 # Add an entry for the respective valve to the valvePositionDict

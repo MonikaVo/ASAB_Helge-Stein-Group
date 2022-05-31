@@ -1,7 +1,7 @@
 config = dict()
 
-experimentFolder = ".." # edited prior to publication
-auxiliaryFolderHardware = "filesForOperation\\hardware" # edited prior to publication
+baseFolder = ".." # edited prior to publication
+experimentFolder = "..." # edited prior to publication
 
 config["balanceDriver"] = {"serialPort": "<COM port>",
                     "settings": {'baudrate': 115200, 'bytesize': 8, 'parity': 'N', 'stopbits': 1, 'xonxoff': False, 'dsrdtr': False, 'rtscts': False, 'timeout': 0, 'write_timeout': None, 'inter_byte_timeout': None},
@@ -9,11 +9,11 @@ config["balanceDriver"] = {"serialPort": "<COM port>",
 
 config["balance"] = {"simulated": True}
 
-config["CetoniDeviceDriver"] = {"availableSyringes": auxiliaryFolderHardware + "\\syringes.txt",
-                    "configPath": experimentFolder + "...\\ASAB_Conf1_sim", # edited prior to publication
+config["CetoniDeviceDriver"] = {"availableSyringes": experimentFolder + "\\syringes.txt",
+                    "configPath": baseFolder + "...\\ASAB_Conf1_sim", # edited prior to publication
                     "syringeConfig": {"A0.0": "10_mL", "B0.0": "10_mL", "C0.0": "10_mL", "D0.0": "10_mL", "E0.0": "10_mL", "F0.0": "10_mL"},
-                    "valvePositionDict": auxiliaryFolderHardware + "\\valvePositionDict.txt",
-                    "setup": auxiliaryFolderHardware + "\\setup.txt",
+                    "valvePositionDict": experimentFolder + "\\valvePositionDict.txt",
+                    "setup": experimentFolder + "\\setup.txt",
                     "flow": 0.03,
                     "simulateBalance": True}
 
@@ -37,10 +37,10 @@ config["CetoniDevice"] = {"waste": "waste_1",
 
 config["densioVisco"] = {"measure": {"inputFolder": "...\\input"}} # edited prior to publication
 
-config["syringes"] = {"savePath": auxiliaryFolderHardware + "\\syringes.txt"}
+config["syringes"] = {"savePath": experimentFolder + "\\syringes.txt"}
 
-config["graph"] = {"pathNodes": auxiliaryFolderHardware + "\\nodes.csv",
-                    "pathEdges": auxiliaryFolderHardware + "\\edges.csv",
-                    "pathTubing": auxiliaryFolderHardware + "\\tubing.csv",
-                    "savePath": auxiliaryFolderHardware + "\\setup.txt",
-                    "saveNameValvePositionDict": auxiliaryFolderHardware + "\\valvePositionDict.txt"}
+config["graph"] = {"pathNodes": experimentFolder + "\\nodes.csv",
+                    "pathEdges": experimentFolder + "\\edges.csv",
+                    "pathTubing": experimentFolder + "\\tubing.csv",
+                    "savePath": experimentFolder + "\\setup.txt",
+                    "saveNameValvePositionDict": experimentFolder + "\\valvePositionDict.txt"}
