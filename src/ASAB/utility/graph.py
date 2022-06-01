@@ -55,8 +55,8 @@ def findClosest(node:str, candidates:list, graph:Union[str,nx.classes.digraph.Di
     and the path from the specified node to this candidate node. candidates is of type "list". '''
     ## Check the input types
     # check node, candidates, weight and direction
-    if (not isinstance(node, str)) or (not isinstance(candidates, list)) or (not isinstance(weight, str)) or (not isinstance(direction, str)):
-        raise ValueError
+    # if (not isinstance(node, str)) or (not isinstance(candidates, list)) or (not isinstance(weight, str)) or (not isinstance(direction, str)):
+    #     raise ValueError
     # check graph
     graph = getGraph(graph)
     # check valvePositionDict
@@ -69,22 +69,33 @@ def findClosest(node:str, candidates:list, graph:Union[str,nx.classes.digraph.Di
     for candidate in candidates:
         # If the direction is outgoing from the node, check the paths starting from the node and ending in the candidate
         if direction=="out":
-            # Get a valid path
-            path_out = findPath(start_node=node, end_node=candidate, valvePositionDict=valvePositionDict, graph=graph, weight=weight)
-            # Get the total weight of the path
-            length_out = getTotalQuantity(nodelist=path_out, quantity=weight)
-            # Store the values in the prepared dataframe
-            shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPathLength"] = length_out
-            shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPath"] = str(path_out)
+            try:
+                # Get a valid path
+                path_out = findPath(start_node=node, end_node=candidate, valvePositionDict=valvePositionDict, graph=graph, weight=weight)
+                # Get the total weight of the path
+                length_out = getTotalQuantity(nodelist=path_out, quantity=weight)
+                # Store the values in the prepared dataframe
+                shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPathLength"] = length_out
+                shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPath"] = str(path_out)
+            except IndexError:
+                # Store infinite length and the string 'no path' in the prepared dataframe
+                shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPathLength"] = np.inf
+                shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPath"] = 'no path'
         # If the direction is incoming to the node, check the paths starting from the candidate and ending in the node
         elif direction=="in":
-            # Get a valid path
-            path_in = findPath(start_node=candidate, end_node=node, valvePositionDict=valvePositionDict, graph=graph, weight=weight)
-            # Get the total weight of the path
-            length_in = getTotalQuantity(nodelist=path_in, quantity=weight)
-            # Store the values in the prepared dataframe
-            shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPathLength"] = length_in
-            shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPath"] = str(path_in)
+            try:
+                # Get a valid path
+                path_in = findPath(start_node=candidate, end_node=node, valvePositionDict=valvePositionDict, graph=graph, weight=weight)
+                # Get the total weight of the path
+                length_in = getTotalQuantity(nodelist=path_in, quantity=weight)
+                # Store the values in the prepared dataframe
+                shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPathLength"] = length_in
+                shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPath"] = str(path_in)
+            except IndexError:
+                # Store infinite length and the string 'no path' in the prepared dataframe
+                shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPathLength"] = np.inf
+                shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPath"] = 'no path'
+
     # Find the closest candidate in the dataframe
     closest = shortest_distances.loc[shortest_distances["shortestPathLength"]==min(shortest_distances["shortestPathLength"]), "candidate"].values[0]
     # Extract the path to the closest candidate from the dataframe
@@ -242,11 +253,11 @@ def appendEdge(edgelst:list, edge_name:str, edgeNodes:pd.DataFrame, edgeProps:pd
 # TODO: also check and load positions
 def drawGraph(graph:nx.DiGraph, positions:dict, wlabels:bool=True):
     ''' This function draws and shows a graph. '''
-    ## Check types
-    # check positions and wlabels
-    if (not type(positions)==dict) or (not type(wlabels) == bool):
-        print("positions:", type(positions), "wlabels:", type(wlabels))
-        raise ValueError
+    # ## Check types
+    # # check positions and wlabels
+    # if (not type(positions)==dict) or (not type(wlabels) == bool):
+    #     print("positions:", type(positions), "wlabels:", type(wlabels))
+    #     raise ValueError
     # check graph
     graph = getGraph(graph)
     nx.draw(graph, pos=positions, with_labels=wlabels)
@@ -509,6 +520,37 @@ def findPumps(pumps:dict, **conditions:str):
         output[p.name] = p
     # Return the dictionary of the found pumps
     return output
+
+def getOpenEnds(setup:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"]):
+    ''' This function finds the open ends in a graph. An open end is characterized by only one edge being attached to it. Since the graph is directed, but allows for
+    bidirectional connections, some edges are added twice to cover both directions. Hence, an open End hat two edges with the same label. The function returns a list
+    of the nodes, which are open ends. '''
+    # ensure that setup is a graph
+    setup = getGraph(setup)
+    ## Find all nodes with degree 2
+    # get all the degrees for all notdes in the graph
+    degrees = pd.DataFrame(setup.degree, columns=['nodes', 'degree'])   # https://networkx.org/documentation/stable/reference/classes/generated/networkx.Graph.degree.html
+    print(degrees)
+    # nodes with degree zero do not have a connection to the graph and are therefore not reachable
+    degreesNonZero = degrees.loc[degrees['degree'] != 0]
+    # the open ends will have a degree of max. 2
+    degrees2 = degreesNonZero.loc[degreesNonZero['degree'] <= 2]
+    ''' TODO: exclude open ends directly at valves. E.g. V1.6'''
+    # for each of the nodes with a non-zero degree of less or equal 2
+    for n in degrees2['nodes']:
+        print(n, setup.degree(n))
+        # get the outgoing edges
+        outedges = list(setup.out_edges(n))
+        # get the incoming edges
+        inedges = list(setup.in_edges(n))
+        # invert the inedges so they would represent the outedges, if the node is an open end
+        invInedges = [(ie[1], ie[0]) for ie in inedges]
+        print(outedges)
+        print(invInedges)
+
+    print(degrees2)
+    return openEnds
+
 
 
     # TODO: Implement function to automatically find a practical way to realize an experiment. (Pump substance X from A to B via C.) This will require the following subfunctions:

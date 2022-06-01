@@ -84,7 +84,7 @@ def getValvePositionDict(vPd:Union[str,dict]):
     if isinstance(vPd, dict):
         valvePositionDict = vPd
     elif isinstance(vPd, str):
-        valvePositionDict = loadValvePositionDict(vPd)
+        valvePositionDict = loadValvePositionDict(path_to_ValvePositionDict=vPd)
     else:
         raise ValueError(f'Incorrect type of {vPd} {type(vPd)} instead of str or dict.')
     return valvePositionDict
@@ -244,7 +244,8 @@ class cetoni:
     def getValvePositions(valvesDict:dict, valvePositionDict:str=conf["CetoniDeviceDriver"]["valvePositionDict"]):
         ''' This function returns the positions of all valves in the system in a dictionary. The designations of the valves are the keys.
         It takes the dicts of valves and the path to the valvePositionDict as inputs. '''
-        valvePositionDict = loadValvePositionDict(vPd=valvePositionDict)
+        if type(valvePositionDict) != dict:
+            valvePositionDict = loadValvePositionDict(path_to_ValvePositionDict=valvePositionDict)
         valvePos = {}
         for valve in valvePositionDict.keys():
             # Write the current valve position for each valve in the dict "valvePos"

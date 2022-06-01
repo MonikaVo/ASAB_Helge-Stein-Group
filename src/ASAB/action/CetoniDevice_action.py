@@ -7,6 +7,7 @@ except ImportError:
     from ASAB.configuration import default_config
     conf = default_config.config
 
+
 from ASAB.configuration import config
 cf = config.configASAB
 
@@ -121,8 +122,8 @@ def provideSample(measurementtype:str, sample_node:str, pumps:dict, valves:dict,
     # TODO: Test this function!!!
     
     ## Check the input types
-    inputTypes = {'measurementtype':str, 'sample_node':str, 'pumps':dict, 'valves':dict, 'waste':str}
-    typeCheckDict(inputTypes=inputTypes)
+    # inputTypes = {'measurementtype':str, 'sample_node':str, 'pumps':dict, 'valves':dict, 'waste':str}
+    # typeCheckDict(inputTypes=inputTypes)
     
     # Find a path from the sample_node to the inlet of the device
     pathSIN = graph.findPath(start_node=sample_node, end_node=f"{measurementtype}IN")
@@ -151,6 +152,29 @@ def provideSample(measurementtype:str, sample_node:str, pumps:dict, valves:dict,
     CetoniDevice_driver.pumpObj.stop_all_pumps()
     ## Wait a while for the liquid to get stable
     time.sleep(10)
+
+def clean(setup:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], waste:str=conf["CetoniDevice"]["waste"], gas:str=conf["CetoniDevice"]["gas"], flow:float=conf["CetoniDeviceDriver"]["flow"]):
+    ''' This function cleans the whole pumping system including the tubing and the devices. '''
+    # TODO: Test this function
+
+    # ensure that setup is a graph
+    setup = graph.getGraph(setup)
+
+    # find the open ends in the graph
+    openEnds = graph.getOpenEnds(setup)
+
+    # find a path to each open end
+
+    # clean the paths
+
+    # clean each device
+
+    # report done
+
+
+def cleanDevice(deviceName:str):
+    ''' This function cleans an individual device. The designation of the device is given as the deviceName. '''
+
 
 
 def emptySyringes(pumps:dict, valves:dict, waste:str=conf["CetoniDevice"]["waste"], gas:str=conf["CetoniDevice"]["gas"], repeats:int = 3):
@@ -285,12 +309,12 @@ def switchValves(nodelist:list, valvesDict:dict, settings:dict={}, valvePosition
             # Print how the valves are switched
             print(f"{valve}: {valvesDict[valve].actual_valve_position()}")
 
-def fillSyringe(pump:pumpObj, volume:float, valvesDict:dict, reservoir:str, waste:str=conf["CetoniDevice"]["waste"], flow:float=conf["CetoniDeviceDriver"]["flow"], setup=conf["CetoniDeviceDriver"]["setup"], valvePositionDict:dict=conf["CetoniDeviceDriver"]["valvePositionDict"], simulateBalance:bool=conf["CetoniDeviceDriver"]["simulateBalance"]):
+def fillSyringe(pump:pumpObj, volume:float, valvesDict:dict, reservoir:str, waste:str=conf["CetoniDevice"]["waste"], flow:float=conf["CetoniDeviceDriver"]["flow"], setup=conf["CetoniDeviceDriver"]["setup"], valvePositionDict:str=conf["CetoniDeviceDriver"]["valvePositionDict"], simulateBalance:bool=conf["CetoniDeviceDriver"]["simulateBalance"]):
     ''' This function ensures that the syringe does not contain gas, but only liquid. '''
         
     ## Check the input types
-    inputTypes = {'pump':pumpObj, 'volume':float, 'valvesDict':dict, 'reservoir':str, 'waste':str, 'flow':float, 'simulateBalance':bool}
-    typeCheckDict(inputTypes=inputTypes)
+    # inputTypes = {'pump':pumpObj, 'volume':float, 'valvesDict':dict, 'reservoir':str, 'waste':str, 'flow':float, 'simulateBalance':bool}
+    # typeCheckDict(inputTypes=inputTypes)
     # check valvePositionDict
     valvePositionDict = getValvePositionDict(vPd=valvePositionDict)
     # check setup
