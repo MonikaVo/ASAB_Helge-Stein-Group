@@ -7,7 +7,6 @@ except ImportError:
     from ASAB.configuration import default_config
     conf = default_config.config
 
-
 from ASAB.configuration import config
 cf = config.configASAB
 
@@ -22,6 +21,7 @@ from ASAB.driver.CetoniDevice_driver import getValvePositionDict, pumpObj
 import sys
 sys.path.append(cf["QmixSDK_python"])
 from qmixsdk import qmixbus
+from qmixsdk.qmixbus import PollingTimer
 
 ## Other imports
 from typing import Union
@@ -153,27 +153,75 @@ def provideSample(measurementtype:str, sample_node:str, pumps:dict, valves:dict,
     ## Wait a while for the liquid to get stable
     time.sleep(10)
 
-def clean(setup:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], waste:str=conf["CetoniDevice"]["waste"], gas:str=conf["CetoniDevice"]["gas"], flow:float=conf["CetoniDeviceDriver"]["flow"]):
+def cleanPath(path:list, pumpsDict:dict, mediumReservoir:str=conf["CetoniDevice"]["gas"], waste:str=conf["CetoniDevice"]["waste"], flow:float=conf["CetoniDeviceDriver"]["flow"], repeats:int=3):
+    ''' This function cleans a path entered as a list of nodes using the medium provided in the mediumReservoir. '''
+    # TODO: test this function
+
+    # initialise a timer
+    timer = PollingTimer(period_ms=60000)
+    # find the closest pump to the start node of the path
+    p, pathMP = graph.findClosest(node=mediumReservoir, candidates=pumpsDict.keys(), direction='out')
+    # find a path from the pump via the path to the waste
+    pathPW = graph.findPath(start_node=p, end_node=waste, via=path)
+    if graph.pathIsValid(pathPW):
+        for i in range(repeats):
+            switchValves(pathMP)
+            pumpsDict[p].set_fill_level(pumpsDict[p].get_volume_max(), flow)
+            timer.wait_until(pumpsDict[p].is_pumping, False)
+            switchValves(pathPW)
+            pumpsDict[p].set_fill_level(0.0, flow)
+            timer.wait_until(pumpsDict[p].is_pumping, False)
+        # update the system status to note the current filling of the tubes.
+        graph.updateSystemStatus(path=pathPW)
+        return True
+    else:
+        raise ValueError(f'The path from the pump {p} via the path {path} to the waste {waste}: {pathPW} is not valid!')
+
+def clean(pumpsDict:dict, setup:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], waste:str=conf["CetoniDevice"]["waste"], gas:str=conf["CetoniDevice"]["gas"], flow:float=conf["CetoniDeviceDriver"]["flow"]):
     ''' This function cleans the whole pumping system including the tubing and the devices. '''
     # TODO: Test this function
+
+    # Message the user to ensure all open ends are in a container
+    input('Please ensure, that all open ends are positioned inside a container.')
 
     # ensure that setup is a graph
     setup = graph.getGraph(setup)
 
+    # initialise a timer
+    timer = PollingTimer(period_ms=60000)
+
+    ## Drain residues from syringe using gas
+    # aspirate gas to all pumps, dispense to waste, do this two times
+    for p in pumpsDict.keys():
+        # find a path from each pump to the waste
+        path = graph.findPath(start_node=p, end_node=waste)
+        # clean the path three times using gas
+        cleanPath(path=path, pumpsDict=pumpsDict, mediumReservoir='ambient', repeats=3)
+
+    ## Clean the devices
+    # identify the devices
+    devices = [n[:-2] for n in list(setup.nodes()) if 'IN' in n]
+    print('devices', devices)
+    ## Iterate through the devices and clean each of them
+    for d in devices:
+        pathIO = graph.findPath(start_node=f'{d}IN', end_node=f'{d}OUT', repeats=3)
+    
+    ## Clean the open ends except reservoirs and solvents
     # find the open ends in the graph
     openEnds = graph.getOpenEnds(setup)
 
+    # Exclude solvents and reservoirs to clean them last
     # find a path to each open end
+    # for oe in openEnds:
+    #     pathPO = graph.findClosest()
 
     # clean the paths
 
-    # clean each device
+    ## Clean the solvents
+
+    ## Clean the reservoirs
 
     # report done
-
-
-def cleanDevice(deviceName:str):
-    ''' This function cleans an individual device. The designation of the device is given as the deviceName. '''
 
 
 

@@ -77,7 +77,7 @@ def findClosest(node:str, candidates:list, graph:Union[str,nx.classes.digraph.Di
                 # Store the values in the prepared dataframe
                 shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPathLength"] = length_out
                 shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPath"] = str(path_out)
-            except IndexError:
+            except (IndexError, nx.exception.NetworkXNoPath):   # https://stackoverflow.com/questions/6095717/python-one-try-multiple-except
                 # Store infinite length and the string 'no path' in the prepared dataframe
                 shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPathLength"] = np.inf
                 shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPath"] = 'no path'
@@ -91,7 +91,7 @@ def findClosest(node:str, candidates:list, graph:Union[str,nx.classes.digraph.Di
                 # Store the values in the prepared dataframe
                 shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPathLength"] = length_in
                 shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPath"] = str(path_in)
-            except IndexError:
+            except (IndexError, nx.exception.NetworkXNoPath):   # https://stackoverflow.com/questions/6095717/python-one-try-multiple-except
                 # Store infinite length and the string 'no path' in the prepared dataframe
                 shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPathLength"] = np.inf
                 shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPath"] = 'no path'
@@ -527,28 +527,28 @@ def getOpenEnds(setup:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"])
     of the nodes, which are open ends. '''
     # ensure that setup is a graph
     setup = getGraph(setup)
+    # initialise the list to collect the open edges
+    openEnds = []
     ## Find all nodes with degree 2
     # get all the degrees for all notdes in the graph
     degrees = pd.DataFrame(setup.degree, columns=['nodes', 'degree'])   # https://networkx.org/documentation/stable/reference/classes/generated/networkx.Graph.degree.html
-    print(degrees)
     # nodes with degree zero do not have a connection to the graph and are therefore not reachable
     degreesNonZero = degrees.loc[degrees['degree'] != 0]
     # the open ends will have a degree of max. 2
     degrees2 = degreesNonZero.loc[degreesNonZero['degree'] <= 2]
+    degrees2NoValves = degrees2.loc[['V' not in node for node in degrees2['nodes']]]
     ''' TODO: exclude open ends directly at valves. E.g. V1.6'''
     # for each of the nodes with a non-zero degree of less or equal 2
-    for n in degrees2['nodes']:
-        print(n, setup.degree(n))
+    for n in degrees2NoValves['nodes']:
         # get the outgoing edges
-        outedges = list(setup.out_edges(n))
+        outedges = list(setup.out_edges(n)) # https://networkx.org/documentation/stable/reference/classes/generated/networkx.DiGraph.out_edges.html#networkx.DiGraph.out_edges
         # get the incoming edges
-        inedges = list(setup.in_edges(n))
+        inedges = list(setup.in_edges(n))   # https://networkx.org/documentation/stable/reference/classes/generated/networkx.DiGraph.in_edges.html#networkx.DiGraph.in_edges
         # invert the inedges so they would represent the outedges, if the node is an open end
         invInedges = [(ie[1], ie[0]) for ie in inedges]
-        print(outedges)
-        print(invInedges)
-
-    print(degrees2)
+        # accept the node as an open end, if its outedges and inverse inedges are identical or one of them is empty
+        if (outedges == invInedges) or (outedges == []) or (inedges == []):
+            openEnds.append(n)
     return openEnds
 
 

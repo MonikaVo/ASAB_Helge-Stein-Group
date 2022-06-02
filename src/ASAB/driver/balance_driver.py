@@ -53,14 +53,18 @@ class emulatedPort():
         self.port ="Test"
         self.in_waiting = 22
         self.target = 0.0
+        # The counter i is used to get an increasing balance read for the simulated balance as it speeds up the process for simulated balances
+        self.i = 0
 
     def open(self):
         self.is_open = True
 
     def readline(self):
         gener = np.random.default_rng()
+        # Generate list of increasing balance reads
+        listreads = [-0.2568 + 0.003*x for x in range(200)]
         # Generate an arbitrary read
-        read = gener.choice(np.linspace(start=-10.0, stop=15.0, num=np.random.randint(low=30, high=70)))    # https://numpy.org/devdocs/reference/random/generated/numpy.random.choice.html, https://numpy.org/devdocs/reference/random/generated/numpy.random.randint.html
+        read = listreads[self.i] + gener.choice(np.linspace(start=-1., stop=1.5, num=np.random.randint(low=30, high=70)))    # https://numpy.org/devdocs/reference/random/generated/numpy.random.choice.html, https://numpy.org/devdocs/reference/random/generated/numpy.random.randint.html
         # Get the sign of the read
         if read < 0.0:
             sign = "-"
@@ -76,6 +80,8 @@ class emulatedPort():
         read = format(read, " 9.4f")    # https://www.pythoncontent.com/understanding-__format__-in-python/
         # Assemble the output string
         ret = f"G     {sign}{read} g    "
+        # Progress the balance read counter by 1
+        self.i += 1
         # Return an ASCII encoded result
         return ret.encode("ASCII") # https://docs.python.org/3/howto/unicode.html#encodings
 

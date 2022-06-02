@@ -1,6 +1,8 @@
 ## THIS FILE SHOULD NOT BE RUN AS MAIN!!!
 import uvicorn
 from fastapi import FastAPI
+import sys
+sys.path.append(r"<path to project folder>") # edited prior to publication
 
 try:
     from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
