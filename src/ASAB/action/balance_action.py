@@ -9,10 +9,14 @@ except ImportError:
  
  ## Imports from ASAB
 from ASAB.driver import balance_driver
+from ASAB.utility.helpers import typeCheck
 
 
-def readBalance(bal):
+def readBalance(bal:balance_driver.balance):
     ''' This function calls the readBalance method of the balance_driver. It takes a balance object as an input parameter and returns a reading as a float. '''
+    inputTypes = {'bal': balance_driver.balance}
+    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
     return bal.readBalance()
 
 if __name__ == "__main__":

@@ -15,8 +15,8 @@ def loadTxtFile(loadPath:str):
     return dataEval
 
 # TODO:Test this function
-def typeCheckDict(inputTypes:dict):
+def typeCheck(inputObjects:dict, inputTypes:dict):
     ''' This function checks the type for several input parameters passed as a dict. It passes, if the types match and raises a ValueError, if one of the types is incorrect. '''
     for inputParam in inputTypes.keys():
-        if (not isinstance(eval(inputParam), inputTypes[inputParam])):
+        if (not isinstance(inputObjects[inputParam], inputTypes[inputParam])):
             raise ValueError(f'Incorrect type of {inputParam} {type(inputParam)} instead of {inputTypes[inputParam]}.')    # https://stackoverflow.com/questions/20844347/how-would-i-make-a-custom-error-message-in-python

@@ -7,6 +7,9 @@ except ImportError:
     from ASAB.configuration import default_config
     conf = default_config.config
 
+## Imports from ASAB
+from ASAB.utility.helpers import typeCheck
+
 ## Other imports
 import serial  # https://pyserial.readthedocs.io/en/latest/pyserial_api.html#serial.Serial.in_waiting
 import time
@@ -14,7 +17,12 @@ import numpy as np
 
 class balance:
     ''' This class provides basic functionalities required to work with a balance. '''
-    def __init__(self, serialPort=conf["balanceDriver"]["serialPort"], settings=conf["balanceDriver"]["settings"], simulated=conf["balanceDriver"]["simulated"]):
+    def __init__(self, serialPort:str=conf["balanceDriver"]["serialPort"], settings:dict=conf["balanceDriver"]["settings"], simulated:bool=conf["balanceDriver"]["simulated"]):
+        ## Check the input types
+        inputTypes = {'serialPort': str, 'settings': dict, 'simulated': bool}
+        inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+        typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
+
         # If the balance shall be simulated, set the port to be an emulated port. Else set it as a serial object to work with the actual COM port
         if simulated:
             self.port = emulatedPort()

@@ -13,7 +13,7 @@ cf = config.configASAB
 
 ## Imports from ASAB
 from ASAB.utility.syringes import loadSyringeDict, syringe
-from ASAB.utility.helpers import saveToFile
+from ASAB.utility.helpers import saveToFile, typeCheck
 
 # Import from QmixSDK
 import sys
@@ -70,6 +70,11 @@ class pumpObj(qmixpump.Pump):
 
 # TODO: Test this function
 def loadValvePositionDict(path_to_ValvePositionDict:str):
+    ## Check the input types
+    inputTypes = {'path_to_ValvePositionDict': str}
+    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
+
     # Open and read the file containing the data
     with open(path_to_ValvePositionDict, "r") as file:
         rawString = file.readlines()[0]
@@ -93,10 +98,14 @@ class cetoni:
     def __init__(self):
         pass
         
-    def prepareCetoni(config_path:str=conf["CetoniDeviceDriver"]["configPath"], QmixSDK_path:str=cf["QmixSDK"], available_syringes:str=conf["CetoniDeviceDriver"]["availableSyringes"], syringe_config:dict=conf["CetoniDeviceDriver"]["syringeConfig"], save_name_VdP=conf["CetoniDeviceDriver"]["valvePositionDict"]): #, save_name_pumps=conf["CetoniDeviceDriver"]["pumps"]): #, save_name_valves=conf["CetoniDeviceDriver"]["valves"], save_name_channels=conf["CetoniDeviceDriver"]["channels"]):
+    def prepareCetoni(config_path:str=conf["CetoniDeviceDriver"]["configPath"], QmixSDK_path:str=cf["QmixSDK"], available_syringes:str=conf["CetoniDeviceDriver"]["availableSyringes"], syringe_config:dict=conf["CetoniDeviceDriver"]["syringeConfig"], save_name_VdP:str=conf["CetoniDeviceDriver"]["valvePositionDict"]):
         ''' This function sets the Cetoni setup operable. It takes the path for the relevant configuration file and the path to the QmixSDK module
         as inputs, prints the detected setup, configures the syringes and returns one dict containing the pumps ("Pumps") and one containing the valves ("Valves"). '''
-        
+        ## Check the input types
+        inputTypes = {'config_path': str, 'QmixSDK_path': str, 'available_syringes': str, 'syringe_config': dict, 'save_name_VdP': str}
+        inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+        typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
+
         # Load the available syringes
         syr = loadSyringeDict(available_syringes)
         syringes_dict = syringe_config.copy()
@@ -241,11 +250,15 @@ class cetoni:
         qmixbus.Bus.close()
         '''----------------Finishing end----------------'''
 
-    def getValvePositions(valvesDict:dict, valvePositionDict:str=conf["CetoniDeviceDriver"]["valvePositionDict"]):
+    def getValvePositions(valvesDict:dict, valvePositionDict:Union[str, dict]=conf["CetoniDeviceDriver"]["valvePositionDict"]):
         ''' This function returns the positions of all valves in the system in a dictionary. The designations of the valves are the keys.
         It takes the dicts of valves and the path to the valvePositionDict as inputs. '''
-        if type(valvePositionDict) != dict:
-            valvePositionDict = loadValvePositionDict(path_to_ValvePositionDict=valvePositionDict)
+        ## Check the input types
+        inputTypes = {'valvesDict': dict}
+        inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+        typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
+
+        valvePositionDict = getValvePositionDict(vPd=valvePositionDict)
         valvePos = {}
         for valve in valvePositionDict.keys():
             # Write the current valve position for each valve in the dict "valvePos"
@@ -254,6 +267,11 @@ class cetoni:
 
     def pumpingPumps(pumpsDict:dict):
         ''' This function returns a list of pumps, which are currently pumping.'''
+        ## Check the input types
+        inputTypes = {'pumpsDict': dict}
+        inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+        typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
+
         pumping = []
         for p in list(pumpsDict.keys()):
             if pumpsDict[p].is_pumping():

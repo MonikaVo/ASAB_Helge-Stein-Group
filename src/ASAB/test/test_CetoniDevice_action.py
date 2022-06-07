@@ -25,7 +25,7 @@ import numpy as np
 
 def test_switchValves():
     i = 0
-    Ps, Vs, Cs = CetoniDevice_driver.cetoni.prepareCetoni(config_path=conf["CetoniDeviceDriver"]["configPath"], QmixSDK_path=cf["QmixSDK"], available_syringes=conf["CetoniDeviceDriver"]["availableSyringes"], syringe_config=conf["CetoniDeviceDriver"]["syringeConfig"], save_name_VdP=conf["CetoniDeviceDriver"]["valvePositionDict"], save_name_pumps=conf["CetoniDeviceDriver"]["pumps"], save_name_valves=conf["CetoniDeviceDriver"]["valves"], save_name_channels=conf["CetoniDeviceDriver"]["channels"])
+    Ps, Vs, Cs = CetoniDevice_driver.cetoni.prepareCetoni(config_path=conf["CetoniDeviceDriver"]["configPath"], QmixSDK_path=cf["QmixSDK"], available_syringes=conf["CetoniDeviceDriver"]["availableSyringes"], syringe_config=conf["CetoniDeviceDriver"]["syringeConfig"], save_name_VdP=conf["CetoniDeviceDriver"]["valvePositionDict"])
 
     initPos = {'V1': 8, 'V2': 2, 'V3': 7, 'V4': 9, 'V5': 3, 'V6': 9, 'Av': 1, 'Bv': 0, 'Cv': 0, 'Dv': 0, 'Ev': 1, 'Fv': 1}
     for val in Vs.keys():
@@ -42,12 +42,12 @@ def test_switchValves():
 
 # def test_fillSyringe():
 #     i = 0
-#     Ps, Vs, Cs = CetoniDevice_driver.cetoni.prepareCetoni(config_path=conf["CetoniDeviceDriver"]["configPath"], QmixSDK_path=cf["QmixSDK"], available_syringes=conf["CetoniDeviceDriver"]["availableSyringes"], syringe_config=conf["CetoniDeviceDriver"]["syringeConfig"], save_name_VdP=conf["CetoniDeviceDriver"]["valvePositionDict"], save_name_pumps=conf["CetoniDeviceDriver"]["pumps"], save_name_valves=conf["CetoniDeviceDriver"]["valves"], save_name_channels=conf["CetoniDeviceDriver"]["channels"])
+#     Ps, Vs, Cs = CetoniDevice_driver.cetoni.prepareCetoni(config_path=conf["CetoniDeviceDriver"]["configPath"], QmixSDK_path=cf["QmixSDK"], available_syringes=conf["CetoniDeviceDriver"]["availableSyringes"], syringe_config=conf["CetoniDeviceDriver"]["syringeConfig"], save_name_VdP=conf["CetoniDeviceDriver"]["valvePositionDict"])
 #     p = Ps[conf["CetoniDevice"]["testInputFillSyringe"][i]["pump"]]
 #     CetoniDevice_action.switchValves(nodelist=[], settings=conf["CetoniDevice"]["testInputFillSyringe"][i]["valvePos"], valvesDict=Vs, valvePositionDict=CetoniDevice_driver.loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]))
 #     valves_before = CetoniDevice_driver.cetoni.getValvePositions(valvesDict=Vs, valvePositionDict=CetoniDevice_driver.loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]))
 #     level_before = p.get_fill_level()
-#     level_after = CetoniDevice_action.fillSyringe(pump=p, volume=conf["CetoniDevice"]["testInputFillSyringe"][i]["volume"], waste=conf["CetoniDevice"]["testInputFillSyringe"][i]["waste"], valvesDict=Vs, flow=conf["CetoniDeviceDriver"]["flow"], setup=loadFile(conf["CetoniDeviceDriver"]["setup"]), valvePositionDict=loadFile(conf["CetoniDeviceDriver"]["valvePositionDict"]), simulateBalance=conf["CetoniDeviceDriver"]["simulateBalance"])
+#     level_after = CetoniDevice_action.fillSyringe(pump=p, volume=conf["CetoniDevice"]["testInputFillSyringe"][i]["volume"], waste=conf["CetoniDevice"]["testInputFillSyringe"][i]["waste"], valvesDict=Vs, flow=conf["CetoniDeviceDriver"]["flow"], setup=conf["CetoniDeviceDriver"]["setup"], valvePositionDict=conf["CetoniDeviceDriver"]["valvePositionDict"], simulateBalance=conf["CetoniDeviceDriver"]["simulateBalance"])
 #     valves_after = CetoniDevice_driver.cetoni.getValvePositions(valvesDict=Vs, valvePositionDict=CetoniDevice_driver.loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]))
 
 #     print("level_before", level_before)

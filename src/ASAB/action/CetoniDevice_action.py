@@ -11,7 +11,7 @@ from ASAB.configuration import config
 cf = config.configASAB
 
 ## Imports from ASAB
-from ASAB.utility.helpers import typeCheckDict
+from ASAB.utility.helpers import typeCheck
 from ASAB.driver import CetoniDevice_driver, balance_driver
 from ASAB.action import balance_action, densioVisco_action
 from ASAB.utility import graph
@@ -37,8 +37,9 @@ import itertools as it
 def flushSyringe(pumps:dict, valves:dict, pump:str, reservoir:str, waste:str=conf["CetoniDevice"]["waste"], flow:float=conf["CetoniDeviceDriver"]["flow"], repeat:int=3):
     ''' This function flushes the syringe with the fluid, which will be aspirated in the syringe in order to dilute remainders from previous fluids. '''    
     ## Check the input types
-    # inputTypes = {"pumps": dict, "valves": dict, "pump": str, "reservoir": str, "waste": str, "flow": float, "repeat": int}
-    # typeCheckDict(inputTypes=inputTypes)
+    inputTypes = {"pumps": dict, "valves": dict, "pump": str, "reservoir": str, "waste": str, "flow": float, "repeat": int}
+    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
 
     # Initialize a timer
     duration = 120000
@@ -53,7 +54,7 @@ def flushSyringe(pumps:dict, valves:dict, pump:str, reservoir:str, waste:str=con
         # Switch valves according to pathRP
         switchValves(nodelist=pathRP, valvesDict=valves)
         # Aspirate 30 % of the max. volume to the pump
-        pumps[pump].set_fill_level(level=0.3*pumps[pump].get_volume_max(), flow=flow)
+        pumps[pump].set_fill_level(level=0.15*pumps[pump].get_volume_max(), flow=flow)
         # Wait until the pump has finished pumping
         timer.wait_until(pumps[pump].is_pumping, False)
         # Switch valves according to pathPW
@@ -69,7 +70,8 @@ def mix(mixRatio:dict, pumps:dict, valves:dict, assignment:dict=conf["CetoniDevi
 
     ## Check the input types
     inputTypes = {'mixRatio':dict, 'pumps':dict, 'valves':dict, 'assignment':dict, 'waste':str, 'flow':float}
-    typeCheckDict(inputTypes=inputTypes)
+    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
     # check setup
     setup = graph.getGraph(setup)
 
@@ -122,8 +124,9 @@ def provideSample(measurementtype:str, sample_node:str, pumps:dict, valves:dict,
     # TODO: Test this function!!!
     
     ## Check the input types
-    # inputTypes = {'measurementtype':str, 'sample_node':str, 'pumps':dict, 'valves':dict, 'waste':str}
-    # typeCheckDict(inputTypes=inputTypes)
+    inputTypes = {'measurementtype':str, 'sample_node':str, 'pumps':dict, 'valves':dict, 'waste':str}
+    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
     
     # Find a path from the sample_node to the inlet of the device
     pathSIN = graph.findPath(start_node=sample_node, end_node=f"{measurementtype}IN")
@@ -231,7 +234,8 @@ def emptySyringes(pumps:dict, valves:dict, waste:str=conf["CetoniDevice"]["waste
     
     ## Check the input types
     inputTypes = {'pumps':dict, 'valves':dict, 'waste':str, 'gas':str, 'repeats': int}
-    typeCheckDict(inputTypes=inputTypes)
+    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
     
     # Initialize a timer
     timer = qmixbus.PollingTimer(period_ms=120000)
@@ -336,8 +340,9 @@ def emptySyringes(pumps:dict, valves:dict, waste:str=conf["CetoniDevice"]["waste
 def switchValves(nodelist:list, valvesDict:dict, settings:dict={}, valvePositionDict:Union[dict,str]=conf["CetoniDeviceDriver"]["valvePositionDict"]):
     ''' This function gets the valve positions required to realize a certain path and switches the valves accordingly. '''
     ## Check the input types
-    #inputTypes = {'nodelist':list, 'valvesDict':dict, 'settings':dict}  # TODO: Fix this type check!
-    #typeCheckDict(inputTypes=inputTypes)
+    inputTypes = {'nodelist':list, 'valvesDict':dict, 'settings':dict}  # TODO: Fix this type check!
+    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
     # check valvePositionDict
     valvePositionDict = getValvePositionDict(vPd=valvePositionDict)
     
@@ -361,8 +366,9 @@ def fillSyringe(pump:pumpObj, volume:float, valvesDict:dict, reservoir:str, wast
     ''' This function ensures that the syringe does not contain gas, but only liquid. '''
         
     ## Check the input types
-    # inputTypes = {'pump':pumpObj, 'volume':float, 'valvesDict':dict, 'reservoir':str, 'waste':str, 'flow':float, 'simulateBalance':bool}
-    # typeCheckDict(inputTypes=inputTypes)
+    inputTypes = {'pump':pumpObj, 'volume':float, 'valvesDict':dict, 'reservoir':str, 'waste':str, 'flow':float, 'simulateBalance':bool}
+    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
     # check valvePositionDict
     valvePositionDict = getValvePositionDict(vPd=valvePositionDict)
     # check setup
@@ -473,7 +479,8 @@ def cleanMixingsystem(pumpsDict:dict, valvesDict:dict, medium1:str, intermediate
 
     ## Check the input types
     inputTypes = {'pumpsDict':dict, 'valvesDict':dict, 'medium1':str, 'intermediate':bool, 'medium2':str, 'waste':str, 'paths':list, 'flow':float, 'repeats':int}
-    typeCheckDict(inputTypes=inputTypes)
+    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
     # check valvePositionDict
     valvePositionDict = getValvePositionDict(vPd=valvePositionDict)
     # check setup
@@ -568,7 +575,8 @@ def cleanInstrument(pumpsDict:dict, valvesDict:dict, instrumenttype:str, medium1
 
     ## Check the input types
     inputTypes = {'pumpsDict':dict, 'valvesDict':dict, 'instrumenttype':str, 'medium1':str, 'pumpIN':str, 'pumpOUT':str, 'medium2':str, 'waste':str, 'repeats':int}
-    typeCheckDict(inputTypes=inputTypes)
+    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
 
     instrumentIN = f"{instrumenttype}IN"
     instrumentOUT = f"{instrumenttype}OUT"
@@ -637,7 +645,8 @@ def cleanAll(pumpsDict:dict, valvesDict:dict, medium1:str, intermediate:bool=Tru
 
     ## Check the input types
     inputTypes = {'pumpsDict':dict, 'valvesDict':dict, 'medium1':str, 'intermediate':bool, 'medium2':str, 'repeat':int}
-    typeCheckDict(inputTypes=inputTypes)
+    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
 
     all = ["densioVisco", "uvVis"]
     for inst in all:
@@ -654,7 +663,8 @@ def getVolFracs(fracs:tuple, labels:tuple, density:dict, molarMass:dict, mode:st
     
     ## Check the input types
     inputTypes = {'fracs':tuple, 'labels':tuple, 'density':dict, 'molarMass':dict, 'mode':str}
-    typeCheckDict(inputTypes=inputTypes)
+    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
     
     fracs = dict(zip(labels, fracs))
     # Prepare a dataframe for the ratios of each relevant quantity
@@ -692,9 +702,10 @@ def goToRefPos(pumpsDict:dict, valvesDict:dict, mode:str, gas:str=conf["CetoniDe
     it is avoidable. '''
     # TODO: Test this function!!!
     
-    # ## Check the input types
-    # inputTypes = {'pumpsDict':dict, 'valvesDict':dict, 'mode':str, 'gas':str, 'waste':str}
-    # typeCheckDict(inputTypes=inputTypes)
+    ## Check the input types
+    inputTypes = {'pumpsDict':dict, 'valvesDict':dict, 'mode':str, 'gas':str, 'waste':str}
+    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
     
     timer = qmixbus.PollingTimer(120000)
     for p in list(pumpsDict.keys()):

@@ -7,6 +7,9 @@ except ImportError:
     from ASAB.configuration import default_config
     conf = default_config.config
 
+## Imports from ASAB
+from ASAB.utility.helpers import typeCheck
+
 ## Other imports
 import numpy as np
 import pandas as pd
@@ -15,6 +18,11 @@ import time
 def measure(sampleName:str, method:str="Density"):
     ''' This function performs a measurement in the defined method on the density meter and viscosimeter. '''
     # TODO: Test this function!!!
+    ## Check the input types
+    inputTypes = {'sampleName': str, 'method': str}
+    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
+
     # Get the folder, where to place the .lims file
     inputFolder = conf["densioVisco"]["measure"]["inputFolder"]
     # Generate a .lims file according to protocol V100 in order to trigger a measurement
@@ -24,6 +32,11 @@ def measure(sampleName:str, method:str="Density"):
 def check(sampleName:str, checktype:str, method:str="Density"):
     ''' This function provides a functionality for automatically running nitrogen and hexane checks. '''
     # TODO: Test this function!!!
+    ## Check the input types
+    inputTypes = {'sampleName': str, 'checkType': str, 'method': str}
+    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
+
     # Get the folder, where to place the .lims file
     inputFolder = conf["densioVisco"]["measure"]["inputFolder"]
     # Generate a .lims file according to protocol V200 in order to trigger a check
@@ -32,6 +45,11 @@ def check(sampleName:str, checktype:str, method:str="Density"):
 
 def retrieveData(sampleName:str, method:str, methodtype:str, savePath:str):
     ''' This funciton retrieves data from density and viscosity measurements and saves them in a dict data format to a .json file in the specified folder (savePath). '''
+    ## Check the input types
+    inputTypes = {'sampleName': str, 'method': str, 'methodtype': str, 'savePath': str}
+    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
+
     data = 0
     while type(data)==int:
         try:
@@ -83,4 +101,4 @@ def retrieveData(sampleName:str, method:str, methodtype:str, savePath:str):
         file.write(str(extractedData))   # https://stackoverflow.com/questions/29223246/how-do-i-save-data-in-a-text-file-python
     with open(f"{savePath}\\{sampleName}_result.json", "w") as file:
         file.write(str(extractedData2))
-    return extractedData
+    return extractedData2
