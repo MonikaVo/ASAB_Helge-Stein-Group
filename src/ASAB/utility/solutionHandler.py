@@ -37,7 +37,7 @@ class Solution:
         self.denisty = density
         self.reservoir = reservoir
 
-def getSolutions(solutionconfig=conf['solutionHandler']):
+def getStockSolutions(solutionconfig=conf['solutionHandler']):
     ''' This function generates solutions based on the entries in the config file. '''
     chemicals = {}
     for chem in solutionconfig['chemicals']:
