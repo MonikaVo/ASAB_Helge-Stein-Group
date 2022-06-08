@@ -65,7 +65,7 @@ def flushSyringe(pumps:dict, valves:dict, pump:str, reservoir:str, waste:str=con
         timer.wait_until(pumps[pump].is_pumping, False)
 
 def mix(mixRatio:dict, pumps:dict, valves:dict, assignment:dict=conf["CetoniDevice"]["assignment"], waste:str=conf["CetoniDevice"]["waste"], gas:str=conf["CetoniDevice"]["gas"], setup:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], flow:float=conf["CetoniDeviceDriver"]["flow"]):
-    ''' This function mixes from reservoirs according to the given mixing ratio.
+    ''' This function mixes from reservoirs according to the given mixing ratio. The mixing ratio must be given as volume fractions for the solution in each reservoir.
     mixRatio = {"Reservoi1": 0.2, "Reservoir2": 0.8}'''
 
     ## Check the input types
@@ -655,46 +655,6 @@ def cleanAll(pumpsDict:dict, valvesDict:dict, medium1:str, intermediate:bool=Tru
     emptySyringes(pumps=pumpsDict, valves=valvesDict)
     goToRefPos(pumpsDict=pumpsDict, valvesDict=valvesDict, mode="end")
     return True
-
-
-def getVolFracs(fracs:tuple, labels:tuple, density:dict, molarMass:dict, mode:str="mole"):
-    ''' This function calculates volume fractions from molar fractions. Further options will be available as needed. Implemented for ternary only! It negelects the mixing volume. '''
-    # TODO: Test this function!!!
-    
-    ## Check the input types
-    inputTypes = {'fracs':tuple, 'labels':tuple, 'density':dict, 'molarMass':dict, 'mode':str}
-    inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
-    typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
-    
-    fracs = dict(zip(labels, fracs))
-    # Prepare a dataframe for the ratios of each relevant quantity
-    empty = np.full((len(fracs), len(fracs)), fill_value=np.NaN)
-    # Generate the dataframes
-    moleRatios = pd.DataFrame(data=empty.copy(), columns=labels, index=labels)
-    densityRatios = pd.DataFrame(data=empty.copy(), columns=labels, index=labels)
-    massRatios = pd.DataFrame(data=empty.copy(), columns=labels, index=labels)
-    # Get the positions of the relevant ratios
-    permutations = list(it.permutations(labels, 2))
-    # Fill the dataframes with the relevant ratios
-    for p in permutations:
-        # If the fraction would require to divide by zero, the value shall be set to NaN. Zero cannot be used, because this will lead to the calculation of the volume fraction to 1.0.
-        try:
-            moleRatios.loc[p[0], p[1]] = fracs[p[0]]/fracs[p[1]]
-        except ZeroDivisionError:
-            moleRatios.loc[p[0], p[1]] = np.nan
-        densityRatios.loc[p[0], p[1]] = density[p[0]]/density[p[1]]
-        massRatios.loc[p[0], p[1]] = molarMass[p[0]]/molarMass[p[1]]
-    # Initialize dictionary to store the volume fractions
-    volFracs = {}
-    # Calculate the volume fractions
-    volFracs[labels[0]] = 1./(moleRatios.loc[labels[2], labels[0]]*densityRatios.loc[labels[0], labels[2]]*massRatios.loc[labels[2],labels[0]] + 1. + moleRatios.loc[labels[1], labels[0]]*densityRatios.loc[labels[0], labels[1]]*massRatios.loc[labels[1],labels[0]])
-    volFracs[labels[1]] = 1./(moleRatios.loc[labels[0], labels[1]]*densityRatios.loc[labels[1], labels[0]]*massRatios.loc[labels[0],labels[1]] + 1. + moleRatios.loc[labels[2], labels[1]]*densityRatios.loc[labels[1], labels[2]]*massRatios.loc[labels[2],labels[1]])
-    volFracs[labels[2]] = 1./(moleRatios.loc[labels[1], labels[2]]*densityRatios.loc[labels[2], labels[1]]*massRatios.loc[labels[1],labels[2]] + 1. + moleRatios.loc[labels[0], labels[2]]*densityRatios.loc[labels[2], labels[0]]*massRatios.loc[labels[0],labels[2]])
-    # Replace nan values by 0.0 in order to get numeric values for all volume fractions
-    for key in volFracs.keys():
-        volFracs[key] = np.nan_to_num(volFracs[key], nan=0.0)
-    return volFracs
-
 
 def goToRefPos(pumpsDict:dict, valvesDict:dict, mode:str, gas:str=conf["CetoniDevice"]["gas"], waste:str=conf["CetoniDevice"]["waste"]):
     ''' This function moves the syringes to their reference positions. This means that they move to 2 mL or half their size, depending on what is the smaller value. This
