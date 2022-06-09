@@ -9,6 +9,7 @@
 
 import numpy as np
 import pandas as pd
+from scipy.optimize import nnls # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.nnls.html#scipy.optimize.nnls
 
 conf={}
 conf["solutionHandler"] = {'chemicals': [{'shortName': 'LiPF6', 'name': 'lithium hexafluorophosphate', 'molarMass': 151.90, 'molarMassUnit': 'g/mol'},
@@ -34,7 +35,7 @@ class Solution:
         self.name = name
         self.chemicals = {k: chemicalsDict[k] for k in mix.keys()}
         self.mix = mix
-        self.denisty = density
+        self.density = density
         self.reservoir = reservoir
         self.concentrations = {}
 
@@ -50,297 +51,83 @@ def getStockSolutions(solutionconfig=conf['solutionHandler']):
     
     return solutions
 
-# # TODO: put this into config
-# # Set the assumed errors for error calculation
-# errors = pd.DataFrame(data={'mass':{'EMC': 0.0005, 'EC': 0.0005, 'LiTDI': 0.0005, 'LiTDI+LiPF6': 0.0005, 'LiPDI': 0.0005, 'LiPDI+LiPF6': 0.0005, 'LiHDI': 0.0005, 'LiHDI+LiPF6': 0.0005, 'LiPF6': 0.0005, '1M_LiPF6': 0.0005, 'none': 0.0},
-#                             'molarMass': {'EMC': 0.0, 'EC': 0.0, 'LiTDI': 0.0, 'LiTDI+LiPF6': 0.0, 'LiPDI': 0.0, 'LiPDI+LiPF6': 0.0, 'LiHDI': 0.0, 'LiHDI+LiPF6': 0.0, 'LiPF6': 0.0, '1M_LiPF6': 0.0, 'none': 0.0},
-#                             'amountOfSubstance':{'EMC': 0.0, 'EC': 0.0, 'LiTDI': 0.0, 'LiTDI+LiPF6': 0.0, 'LiPDI': 0.0, 'LiPDI+LiPF6': 0.0, 'LiHDI': 0.0, 'LiHDI+LiPF6': 0.0, 'LiPF6': 0.0, '1M_LiPF6': 0.0, 'none': 0.0},
-#                             'massFractions': {'EMC': 0.0, 'EC': 0.0, 'LiTDI': 0.0, 'LiTDI+LiPF6': 0.0, 'LiPDI': 0.0, 'LiPDI+LiPF6': 0.0, 'LiHDI': 0.0, 'LiHDI+LiPF6': 0.0, 'LiPF6': 0.0, '1M_LiPF6': 0.0, 'none': 0.0},
-#                             'moleFractions': {'EMC': 0.0, 'EC': 0.0, 'LiTDI': 0.0, 'LiTDI+LiPF6': 0.0, 'LiPDI': 0.0, 'LiPDI+LiPF6': 0.0, 'LiHDI': 0.0, 'LiHDI+LiPF6': 0.0, 'LiPF6': 0.0, '1M_LiPF6': 0.0, 'none': 0.0},
-#                             'density': {'EMC': 0.0, 'EC': 0.0, 'LiTDI': 0.0, 'LiTDI+LiPF6': 0.0, 'LiPDI': 0.0, 'LiPDI+LiPF6': 0.0, 'LiHDI': 0.0, 'LiHDI+LiPF6': 0.0, 'LiPF6': 0.0, '1M_LiPF6': 0.0, 'none': 0.0}})
+def getVolFracs(mixingRatio:dict, config:dict=conf['solutionHandler']):
+    ''' This function calculates the volume fractions for each solution in the reservoirs to obtain the correct mixing ratio requested or at least a mixture as similar as
+    possible. The composition of the mixture is entered as a dict of mole fractions. Mixing volumes are disregarded.
+    input:
+    mixingRatio: dict of mole fractions for each chemical
+    config: dict containing the information regarding the available stock solutions
 
-# ## Define a function to calculate weight fractions
-# def get_mass_fraction(substance:str, massesDict:dict, errors:pd.DataFrame):
-#     ''' This funciton takes a key for the substance, for which the mass fraction shall be calculated and a dictionary of all the masses involved as
-#     input and returns the mass fraction of the requested substance. '''
-#     # Get an array of all the masses
-#     ms = np.array(list(massesDict.values()))
-#     # Get an array of all the errors
-#     errs = np.array(errors['mass'].values)
-#     # Calculate the mass fraction
-#     w = float(massesDict[substance]) / np.sum(ms)
-#     # Calculate the error of the mass fraction
-#     dw = np.abs((np.sum(ms) - massesDict[substance]) / ((np.sum(ms))**2)) * errors.loc[substance, 'mass'] + np.abs(-((massesDict[substance]) / ((np.sum(ms))**2.))) * (np.sum(errs) - errors.loc[substance, 'mass'])
-#     return w, dw
+    output:
+    volFracs: dict of volume fractions for each stock solution
+    vols_residual: float representing the residual of the solution of the linear equation system
+    '''
+    ## Get the stock solutions
+    stockSolutions = getStockSolutions(solutionconfig=config)
+  
+    for stocksol in stockSolutions.keys():
+        print(stocksol)
+        sol = stockSolutions[stocksol]
+        ## Get the mass of 1L of the solution, factor 1000, because density is expected to be given in the unit g/cm^3
+        m_1L = sol.density * 1000.
+        try:
+            sol.concentrations['LiPF6'] = sol.mix['LiPF6']['value']
+            ## Get the mass of the solvent by subtracting the mass of the concentration of the salt (the amount of salt in 1 L of the solution)
+            m_solv = m_1L - sol.mix['LiPF6']['value'] * sol.chemicals['LiPF6'].molarMass
+        except KeyError:
+            sol.concentrations['LiPF6'] = 0.0
+            m_solv = m_1L
+        ## Get the masses and the concentrations of the solvent components based on the solvent mass ratio
+        m_solvComp = {}
+        for c in sol.mix.keys():
+            if c != 'LiPF6':
+                m_solvComp[c] = sol.mix[c]['value'] * m_solv
+                sol.concentrations[c] = m_solvComp[c] / sol.chemicals[c].molarMass
+        # totalMolPerLiter = np.sum(list(sol.concentrations.values()))
+        # for c in sol.concentrations.keys():
+        #     sol.concentrations[c] = sol.concentrations[c] / totalMolPerLiter
+        # print(sol.concentrations)
+    
+    ## Assemble the linear system of equations
+    ## Get the matrix of stock solutions containing the concentrations of the chemicals in one of the stock solutions as a column
+    # get all chemicals contained in any of the solutions
+    chems = []
+    for s in stockSolutions.values():
+        chems.extend(s.concentrations.keys())
+    # remove duplicates
+    chems = pd.Series(chems).unique()
+    # get the number of stock solutions
+    noStockSols = len(stockSolutions.keys())
+    # initialize a numpy array representing the concentrations of each chemical in a stock solution in a column
+    concentrationArray = pd.DataFrame(np.zeros((len(chems), noStockSols)), columns=stockSolutions.keys(), index=chems)
+    # fill the concentration array
+    for s in stockSolutions.values():
+        for ch, c in s.concentrations.items():
+            concentrationArray.loc[ch, s.name] = c
+    print('C_Array', concentrationArray)
+    
+    
+    ## Assemble vector representing the target composition
+    # extend the vector to contain all chemicals, if this is not the case to match the dimensions of the matrix
+    for item in chems:
+        if not item in mixingRatio.keys():
+            mixingRatio[item] = 0.0
+    targetComp = pd.Series(mixingRatio, name='target', index=mixingRatio.keys())
 
-# def get_amount_of_substance(substance:str, molarMassesDict:dict, massesDict:dict, errors:pd.DataFrame):
-#     ''' This function takes the label of a substance, a dict of molar masses and a dict of masses as input and returns the amount of substance for
-#     the substance requested. '''
-#     # Only, if the substance has a non-zero molar mass, the evaluation is possible. Otherwise, the substance is assumed not to be present in the mixture.
-#     if molarMasses[substance] != 0.0:
-#         # Calculate the amount of substance
-#         n = massesDict[substance] / molarMassesDict[substance]
-#         # Calculate the error of the amount of substance
-#         dn = np.abs(1./molarMassesDict[substance]) * errors.loc[substance, 'mass'] + np.abs(- (massesDict[substance] / (molarMassesDict[substance])**2.)) * errors.loc[substance, 'molarMass']
-#     else:
-#         n = 0.0
-#         dn = 0.0
-#     return n, dn
+    ## Solve the system of linear equations; if an exact solution is not possible, which will be mostly the case, get a minimum 2-norm approximation   # -> https://numpy.org/doc/stable/reference/generated/numpy.linalg.lstsq.html
+    vols, vols_residual = nnls(np.array(concentrationArray), np.array(targetComp), maxiter=None)
+    # vols, vols_residuals, concentrationArray_rank, concentrationArray_singularValues = np.linalg.lstsq(np.array(concentrationArray), np.array(targetComp), rcond=None)
+    print('vols', vols)
+    volFracs = [(v/(np.sum(vols))) for v in vols]
+    print('volfracs', volFracs)
+    volFracs = pd.Series(volFracs, index=stockSolutions.keys())
+    volFracs = dict(volFracs)
+    return volFracs, vols_residual
 
-# def get_mole_fraction(substance:str, amountsOfSubstanceDict:dict, errors:pd.DataFrame):
-#     ''' This function tabes the label of a substance and a dict of the amounts of substances to output the mole fraction for the substance requested. '''
-#     # Get an array of all the amounts of substance
-#     ns = np.array(list(amountsOfSubstanceDict.values()))
-#     # Get an array of the errors of the amounts of substance
-#     errs = np.array(list(errors["amountOfSubstance"].values))
-#     # Calculate the mole fraction
-#     x = float(amountsOfSubstanceDict[substance]) / np.sum(ns)
-#     # Calculate the error of the mole fraction
-#     dx = np.abs((np.sum(ns) - amountsOfSubstanceDict[substance]) / ((np.sum(ns))**2.)) * errors.loc[substance, 'amountOfSubstance'] + np.abs(-((amountsOfSubstanceDict[substance]) / ((np.sum(ns))**2.))) * (np.sum(errs) - errors.loc[substance, 'amountOfSubstance'])
-#     return x, dx
+S = getStockSolutions()
 
-# ## calculate mole fractions for the chemicals in each stock solution
-# errors_stockSol = errors.copy()
-# # iterate over the salts
-# for salt in massData.loc[massData["concentration"] == 1.5, "salt"].unique():
-#     # exclude LiPF6, because this stock solution is based on a commercial solution
-#     if salt != "LiPF6":
-#         # get the masses of EMC and EC
-#         mEMC = massData.loc[(salt, 1.5), "mass of EMC / g"]
-#         mEC = massData.loc[(salt, 1.5), "mass of EC / g"]
-#         # try to get the mass of the salt
-#         try:
-#             mSalt = massData.loc[(salt, 1.5), "mass of salt / g"]
-#         except KeyError:
-#             # if the salt is "none" for the pure solvent solution, set mSalt to 0.0
-#             mSalt = 0.0
-        
-#         # collect the masses in a dict
-#         massesStockSol = {'EMC': mEMC, 'EC': mEC, salt: mSalt}
-
-#         # calculate the mass fractions and amount of substance for each chemical in the stock soltuions and the respective errors
-#         wEMC, d_wEMC = get_mass_fraction('EMC', massesStockSol, errors_stockSol.loc[list(massesStockSol.keys()),:])
-#         nEMC, d_nEMC = get_amount_of_substance('EMC', molarMasses, massesStockSol, errors_stockSol.loc[list(massesStockSol.keys()),:])
-#         wEC, d_wEC = get_mass_fraction('EC', massesStockSol, errors_stockSol.loc[list(massesStockSol.keys()),:])
-#         nEC, d_nEC = get_amount_of_substance('EC', molarMasses, massesStockSol, errors_stockSol.loc[list(massesStockSol.keys()),:])
-#         # the values for LiPF6 are zero, because only the stock solution derived from the commercial solution contains LiPF6
-#         nLiPF6, d_nLiPF6 = 0.0, 0.0
-#         wTotalLiPF6, d_wTotalLiPF6 = 0.0, 0.0
-
-#         wSalt, d_wSalt = get_mass_fraction(salt, massesStockSol, errors_stockSol.loc[list(massesStockSol.keys()),:])
-#         # for the salt "none", no molar mass is found, this is caught by try and except
-#         try:
-#             nSalt, d_nSalt = get_amount_of_substance(salt, molarMasses, massesStockSol, errors_stockSol.loc[list(massesStockSol.keys()),:])
-#         except KeyError:
-#             nSalt, d_nSalt = 0.0, 0.0
-
-#     # calculate amounts of substances for LiPF6 solution with commercial 1M solution, meaning salt == "LiPF6"
-#     elif salt == "LiPF6":
-#         # copy the dataframe of the errors
-#         errors_LiPF6 = errors_stockSol.copy()
-#         # calculate the masses of chemicals in 1 L of the commercial solution
-#         mEMC = (rho_1MLiPF6*1000. - molarMasses["LiPF6"] * 1.)*0.7
-#         mEC = (3./7.) * mEMC
-#         mLiPF6 = molarMasses["LiPF6"] * 1.
-
-#         # collect the masses in a dict
-#         massesLiPF6 = {'EMC': mEMC, 'EC': mEC, 'LiPF6': mLiPF6}
-
-#         # get the errors for all the masses and generate an error dataframe
-#         d_mEMC = np.abs(700.) * errors_stockSol.loc['1M_LiPF6', 'density'] + np.abs(0.7) * errors_stockSol.loc['LiPF6', 'molarMass']
-#         d_mEC = np.abs((3./7.)) * d_mEMC
-#         d_mLiPF6 = 1. * errors_stockSol.loc['LiPF6', 'molarMass']
-
-#         # save the errors to the new dataframe
-#         errors_LiPF6.loc['EMC', 'mass'] = d_mEMC
-#         errors_LiPF6.loc['EC', 'mass'] = d_mEC
-#         errors_LiPF6.loc['LiPF6', 'mass'] = d_mLiPF6
-
-#         # calculate mass fractions and their errors
-#         wEMC, d_wEMC = get_mass_fraction('EMC', massesLiPF6, errors_LiPF6.loc[list(massesLiPF6.keys()),:])
-#         wEC, d_wEC = get_mass_fraction('EC', massesLiPF6, errors_LiPF6.loc[list(massesLiPF6.keys()),:])
-#         wLiPF6, d_wLiPF6 = get_mass_fraction('LiPF6', massesLiPF6, errors_LiPF6.loc[list(massesLiPF6.keys()),:])
-
-#         # calculate masses for actual amount of commercial solution
-#         mActualEMC = wEMC * massData.loc[('LiPF6', 1.5), "mass of 1 M LiPF6 / g"]
-#         mActualEC = wEC * massData.loc[('LiPF6', 1.5), "mass of 1 M LiPF6 / g"]
-#         mActualLiPF6 = wLiPF6 * massData.loc[('LiPF6', 1.5), "mass of 1 M LiPF6 / g"]
-
-#         # calculate the errors for the actual masses
-#         d_mActualEMC = np.abs(wEMC) * errors_LiPF6.loc['1M_LiPF6', 'mass'] + np.abs(massData.loc[('LiPF6', 1.5), "mass of 1 M LiPF6 / g"]) * d_wEMC
-#         d_mActualEC = np.abs(wEC) * errors_LiPF6.loc['1M_LiPF6', 'mass'] + np.abs(massData.loc[('LiPF6', 1.5), "mass of 1 M LiPF6 / g"]) * d_wEC
-#         d_mActualLiPF6 = np.abs(wLiPF6) * errors_LiPF6.loc['1M_LiPF6', 'mass'] + np.abs(massData.loc[('LiPF6', 1.5), "mass of 1 M LiPF6 / g"]) * d_wLiPF6
-
-#         # add the additional LiPF6 added as a salt
-#         mTotalLiPF6 = mActualLiPF6 + massData.loc[('LiPF6', 1.5), "mass of salt / g"]
-
-#         # recalculate the mass error for LiPF6
-#         d_mTotalLiPF6 = d_mActualLiPF6 + errors_LiPF6.loc['LiPF6', 'mass']
-
-#         # update the error dataframe
-#         errors_LiPF6.loc['EMC', 'mass'] = d_mActualEMC
-#         errors_LiPF6.loc['EC', 'mass'] = d_mActualEC
-#         errors_LiPF6.loc['LiPF6', 'mass'] = d_mActualLiPF6
-
-#         # update the masses in massesLiPF6
-#         massesLiPF6 = {'EMC': mActualEMC, 'EC': mActualEC, 'LiPF6': mTotalLiPF6}
-
-#         # recalculate mass fractions for new mass of LiPF6 and new errors
-#         wEMC, d_wEMC = get_mass_fraction('EMC', massesLiPF6, errors_LiPF6.loc[list(massesLiPF6.keys()),:])
-#         wEC, d_wEC = get_mass_fraction('EC', massesLiPF6, errors_LiPF6.loc[list(massesLiPF6.keys()),:])
-#         wTotalLiPF6, d_wTotalLiPF6 = get_mass_fraction('LiPF6', massesLiPF6, errors_LiPF6.loc[list(massesLiPF6.keys()),:])
-#         # calculate the molar fractions
-#         nEMC, d_nEMC = get_amount_of_substance('EMC', molarMasses, massesLiPF6, errors_LiPF6.loc[list(massesLiPF6.keys()),:])
-#         nEC, d_nEC = get_amount_of_substance('EC', molarMasses, massesLiPF6, errors_LiPF6.loc[list(massesLiPF6.keys()),:])
-#         nLiPF6, d_nLiPF6 = get_amount_of_substance('LiPF6', molarMasses, massesLiPF6, errors_LiPF6.loc[list(massesLiPF6.keys()),:])
-
-#         # no salt other than LiPF6 is contained
-#         nSalt, d_nSalt = 0.0, 0.0
-#         wSalt, d_wSalt = 0.0, 0.0    
-
-#     # collect all the amounts of substance in a dictionary
-#     amounts = {'EMC': nEMC, 'EC': nEC, salt: nSalt, 'LiPF6': nLiPF6}
-#     ## update the error dataframe with the new errors for each substance
-#     # mass fractions
-#     errors_stockSol.loc['EMC', 'massFractions'] = d_wEMC
-#     errors_stockSol.loc['EC', 'massFractions'] = d_wEC
-#     errors_stockSol.loc[salt, 'massFractions'] = d_wSalt
-#     errors_stockSol.loc['LiPF6', 'massFractions'] = d_wTotalLiPF6
-#     # amount of substance
-#     errors_stockSol.loc['EMC', 'amountOfSubstance'] = d_nEMC
-#     errors_stockSol.loc['EC', 'amountOfSubstance'] = d_nEC
-#     errors_stockSol.loc[salt, 'amountOfSubstance'] = d_nSalt
-#     errors_stockSol.loc['LiPF6', 'amountOfSubstance'] = d_nLiPF6
-
-#     # calculate and save the mole fraction and the corresponding error
-#     massData.loc[(salt, 1.50), "x_EMC"], massData.loc[(salt, 1.50), "d_x_EMC"] = get_mole_fraction('EMC', amounts, errors_stockSol.loc[amounts.keys(),:])
-#     massData.loc[(salt, 1.50), "x_EC"], massData.loc[(salt, 1.50), "d_x_EC"] = get_mole_fraction('EC', amounts, errors_stockSol.loc[amounts.keys(),:])
-#     if salt != 'LiPF6':
-#         massData.loc[(salt, 1.50), "x_salt"], massData.loc[(salt, 1.50), "d_x_salt"] = get_mole_fraction(salt, amounts, errors_stockSol.loc[amounts.keys(),:])
-#     else:
-#         massData.loc[(salt, 1.50), "x_salt"], massData.loc[(salt, 1.50), "d_x_salt"] = 0.0, 0.0
-#     massData.loc[(salt, 1.50), "x_LiPF6"], massData.loc[(salt, 1.50), "d_x_LiPF6"] = get_mole_fraction('LiPF6', amounts, errors_stockSol.loc[amounts.keys(),:])
-
-#     # save the mass fraction and the corresponding error
-#     massData.loc[(salt, 1.50), "w_EMC"], massData.loc[(salt, 1.50), "d_w_EMC"] = wEMC, d_wEMC
-#     massData.loc[(salt, 1.50), "w_EC"], massData.loc[(salt, 1.50), "d_w_EC"] = wEC, d_wEC
-#     massData.loc[(salt, 1.50), "w_salt"], massData.loc[(salt, 1.50), "d_w_salt"] = wSalt, d_wSalt
-#     massData.loc[(salt, 1.50), "w_LiPF6"], massData.loc[(salt, 1.50), "d_w_LiPF6"] = wTotalLiPF6, d_wTotalLiPF6
-
-# # # Save the results
-# # massData.to_csv(f"{folder}\\tables\\{saveFileMassData}", index=False, sep=";")
-
-# def get_mole_fractions(salt, concentration):
-#     # copy the error dataframe
-#     errors_moleFractions = errors.copy()
-#     # get masses of stock solutions
-#     mSolSalt = massData.loc[(salt, concentration), "mass of stock solution of salt / g"]
-#     mSolSolvent = massData.loc[(salt, concentration), "mass of stock solution of solvent / g"]
-#     mSolLiPF6 = massData.loc[(salt, concentration), "mass of stock solution of LiPF6 / g"]
-
-#     # get mass of chemicals
-#     # salt[0:5] to get the LiTDI... salt from the ones + LiPF6
-#     mEMC = massData.loc[(salt[0:5], 1.50), "w_EMC"] * mSolSalt + massData.loc[("none", 1.50), "w_EMC"] * mSolSolvent + massData.loc[("LiPF6", 1.50), "w_EMC"] * mSolLiPF6
-#     d_mEMC = massData.loc[(salt[0:5], 1.50), "d_w_EMC"] * mSolSalt + massData.loc[(salt[0:5], 1.50), "w_EMC"] * errors_moleFractions.loc['EMC', 'mass'] + massData.loc[("none", 1.50), "d_w_EMC"] * mSolSolvent + massData.loc[("none", 1.50), "w_EMC"] * errors_moleFractions.loc['EMC', 'mass'] + massData.loc[("LiPF6", 1.50), "d_w_EMC"] * mSolLiPF6 + massData.loc[("LiPF6", 1.50), "w_EMC"] * errors_moleFractions.loc['EMC', 'mass']
-#     mEC = massData.loc[(salt[0:5], 1.50), "w_EC"] * mSolSalt + massData.loc[("none", 1.50), "w_EC"] * mSolSolvent + massData.loc[("LiPF6", 1.50), "w_EC"] * mSolLiPF6
-#     d_mEC = massData.loc[(salt[0:5], 1.50), "d_w_EC"] * mSolSalt + massData.loc[(salt[0:5], 1.50), "w_EC"] * errors_moleFractions.loc['EC', 'mass'] + massData.loc[("none", 1.50), "d_w_EC"] * mSolSolvent + massData.loc[("none", 1.50), "w_EC"] * errors_moleFractions.loc['EC', 'mass'] + massData.loc[("LiPF6", 1.50), "d_w_EC"] * mSolLiPF6 + massData.loc[("LiPF6", 1.50), "w_EC"] * errors_moleFractions.loc['EC', 'mass']
-#     mSalt = massData.loc[(salt[0:5], 1.50), "w_salt"] * mSolSalt + massData.loc[("none", 1.50), "w_salt"] * mSolSolvent + massData.loc[("LiPF6", 1.50), "w_salt"] * mSolLiPF6
-#     d_mSalt = massData.loc[(salt[0:5], 1.50), "d_w_salt"] * mSolSalt + massData.loc[(salt[0:5], 1.50), "w_salt"] * errors_moleFractions.loc[salt, 'mass'] + massData.loc[("none", 1.50), "d_w_salt"] * mSolSolvent + massData.loc[("none", 1.50), "w_salt"] * errors_moleFractions.loc[salt, 'mass'] + massData.loc[("LiPF6", 1.50), "d_w_salt"] * mSolLiPF6 + massData.loc[("LiPF6", 1.50), "w_salt"] * errors_moleFractions.loc[salt, 'mass']
-#     mLiPF6 = massData.loc[(salt[0:5], 1.50), "w_LiPF6"] * mSolSalt + massData.loc[("none", 1.50), "w_LiPF6"] * mSolSolvent + massData.loc[("LiPF6", 1.50), "w_LiPF6"] * mSolLiPF6
-#     d_mLiPF6 = massData.loc[(salt[0:5], 1.50), "d_w_LiPF6"] * mSolSalt + massData.loc[(salt[0:5], 1.50), "w_LiPF6"] * errors_moleFractions.loc['LiPF6', 'mass'] + massData.loc[("none", 1.50), "d_w_LiPF6"] * mSolSolvent + massData.loc[("none", 1.50), "w_LiPF6"] * errors_moleFractions.loc['LiPF6', 'mass'] + massData.loc[("LiPF6", 1.50), "d_w_LiPF6"] * mSolLiPF6 + massData.loc[("LiPF6", 1.50), "w_LiPF6"] * errors_moleFractions.loc['LiPF6', 'mass']
-
-#     # save the masses of the chemicals in a dictionary
-#     masses = {'EMC': mEMC, 'EC': mEC, salt[0:5]: mSalt, 'LiPF6': mLiPF6}
-#     # collect the errors of the masses in a dataframe
-#     errors_moleFractions.loc['EMC', 'mass'] = d_mEMC
-#     errors_moleFractions.loc['EC', 'mass'] = d_mEC
-#     errors_moleFractions.loc[salt, 'mass'] = d_mSalt
-#     errors_moleFractions.loc['LiPF6', 'mass'] = d_mLiPF6
-
-#     # get amount of substance
-#     nEC, d_nEC = get_amount_of_substance('EC', molarMasses, masses, errors_moleFractions.loc[masses.keys(),:]) # mEC / molarMasses["EC"]
-#     nEMC, d_nEMC = get_amount_of_substance('EMC', molarMasses, masses, errors_moleFractions.loc[masses.keys(),:]) # mEMC / molarMasses["EMC"]
-#     nLiPF6, d_nLiPF6 = get_amount_of_substance('LiPF6', molarMasses, masses, errors_moleFractions.loc[masses.keys(),:]) # mLiPF6 / molarMasses["LiPF6"]
-#     # lookup in molarMasses does not work for salt "none", this is caught by try and except
-#     # try:
-#     nSalt, d_nSalt = get_amount_of_substance(salt[0:5], molarMasses, masses, errors_moleFractions.loc[masses.keys(),:]) # mSalt / molarMasses[salt[0:5]]
-#     # except KeyError:
-#     #     nSalt, d_nSalt = 0.0, 0.0
-
-#     # save amountsOfSubstance
-#     amountOfSubstance = {'EMC': nEMC, 'EC': nEC, salt[0:5]: nSalt, 'LiPF6': nLiPF6}
-#     # update the errors of the amount of substance
-#     errors_moleFractions.loc['EMC', 'amountOfSubstance'] = d_nEMC
-#     errors_moleFractions.loc['EC', 'amountOfSubstance'] = d_nEC
-#     errors_moleFractions.loc[salt[0:5], 'amountOfSubstance'] = d_nSalt
-#     errors_moleFractions.loc['LiPF6', 'amountOfSubstance'] = d_nLiPF6
-
-#     # get mole fractions
-#     xEC, d_xEC = get_mole_fraction('EC', amountOfSubstance, errors_moleFractions.loc[masses.keys(),:]) # nEC / (nEC + nEMC + nSalt + nLiPF6)
-#     xEMC, d_xEMC = get_mole_fraction('EMC', amountOfSubstance, errors_moleFractions.loc[masses.keys(),:]) # nEMC / (nEC + nEMC + nSalt + nLiPF6)
-#     xLiPF6, d_xLiPF6 = get_mole_fraction('LiPF6', amountOfSubstance, errors_moleFractions.loc[masses.keys(),:]) # nLiPF6 / (nEC + nEMC + nSalt + nLiPF6)
-
-#     if salt != 'LiPF6':
-#         xSalt, d_xSalt = get_mole_fraction(salt[0:5], amountOfSubstance, errors_moleFractions.loc[masses.keys(),:]) # nSalt / (nEC + nEMC + nSalt + nLiPF6)
-#     else:
-#         xSalt, d_xSalt = 0.0, 0.0
-
-#     return {"EC": xEC, "error_EC": d_xEC, "EMC": xEMC, "error_EMC": d_xEMC, "salt": xSalt, "error_salt": d_xSalt, "LiPF6": xLiPF6, "error_LiPF6": d_xLiPF6}
-
-# # calculate the mole fractions for all solutions
-# # iterate i over all salts
-# for i in massData["salt"].unique():
-#     # j iterates over all concentrations available for the respective salt
-#     for j in massData.loc[massData["salt"] == i, "concentration"]:
-#         # exclude the salt "none" and the concentration 1.5, because these are the stock solutions, for which the values are already calculated above
-#         if i != "none" and j != 1.5:
-#             fractions = get_mole_fractions(i, j)
-#             massData.loc[(i,j), "x_EC"], massData.loc[(i,j), "d_x_EC"] = fractions["EC"], fractions["error_EC"]
-#             massData.loc[(i,j), "x_EMC"], massData.loc[(i,j), "d_x_EMC"] = fractions["EMC"], fractions["error_EMC"]
-#             massData.loc[(i,j), "x_salt"], massData.loc[(i,j), "d_x_salt"] = fractions["salt"], fractions["error_salt"]
-#             massData.loc[(i,j), "x_LiPF6"], massData.loc[(i,j), "d_x_LiPF6"] = fractions["LiPF6"], fractions["error_LiPF6"]
-
-# # Save the results
-# massData.to_csv(f"{folder}\\tables\\{saveFileMassData}", index=False, sep=";")
-
-# ## Save the mole fractions and their errors to the total results file
-# with open(inputFileResults, "r") as file_res:
-#     results = pd.read_csv(file_res, sep=";")
-# ## Assign a multiindex to the results
-# results = results.set_index(["salt", "concentration"])
-
-# ## Set the index of massData to salt and concentration
-# massData = massData.set_index(["salt", "concentration"])
-
-# # iterate through all combinations of salts and concentrations in massData
-# for salt, concentration in massData.index:
-#     print(salt, concentration)
-#     # Put the compositions and the errors to the results
-#     results.loc[(salt,float(concentration)), "x_salt"] = massData.loc[(salt, float(concentration)), "x_salt"]
-#     results.loc[(salt,float(concentration)), "d_x_salt"] = massData.loc[(salt, float(concentration)), "d_x_salt"]
-
-#     results.loc[(salt,float(concentration)), "x_LiPF6"] = massData.loc[(salt, float(concentration)), "x_LiPF6"]
-#     results.loc[(salt,float(concentration)), "d_x_LiPF6"] = massData.loc[(salt, float(concentration)), "d_x_LiPF6"]
-
-#     results.loc[(salt,float(concentration)), "x_EC"] = massData.loc[(salt, float(concentration)), "x_EC"]
-#     results.loc[(salt,float(concentration)), "d_x_EC"] = massData.loc[(salt, float(concentration)), "d_x_EC"]
-
-#     results.loc[(salt,float(concentration)), "x_EMC"] = massData.loc[(salt, float(concentration)), "x_EMC"]
-#     results.loc[(salt,float(concentration)), "d_x_EMC"] = massData.loc[(salt, float(concentration)), "d_x_EMC"]
-
-#     results.loc[(salt,float(concentration)), "m_EC/m_EMC"] = (massData.loc[(salt, float(concentration)), "x_EC"]*molarMasses["EC"])/(massData.loc[(salt, float(concentration)), "x_EMC"]*molarMasses["EMC"])
-#     results.loc[(salt,float(concentration)), "d_m_EC/m_EMC"] = np.abs((molarMasses["EC"])/(massData.loc[(salt, float(concentration)), "x_EMC"]*molarMasses["EMC"])) * massData.loc[(salt, float(concentration)), "d_x_EC"] + \
-#                                                                 np.abs((massData.loc[(salt, float(concentration)), "x_EC"])/(massData.loc[(salt, float(concentration)), "x_EMC"]*molarMasses["EMC"])) * errors.loc['EC', 'density'] + \
-#                                                                 np.abs(-(massData.loc[(salt, float(concentration)), "x_EC"] * molarMasses["EC"])/(((massData.loc[(salt, float(concentration)), "x_EMC"])**2.)*molarMasses["EMC"])) * massData.loc[(salt, float(concentration)), "d_x_EMC"] + \
-#                                                                 np.abs(-(massData.loc[(salt, float(concentration)), "x_EC"] * molarMasses["EC"])/(massData.loc[(salt, float(concentration)), "x_EMC"]*((molarMasses["EMC"])**2.))) * errors.loc['EMC', 'density']   # https://stackoverflow.com/questions/53162/how-can-i-do-a-line-break-line-continuation-in-python
-
-#     if "+LiPF6" in salt:
-#         results.loc[(salt,float(concentration)), "n_salt/n_LiPF6"] = massData.loc[(salt, float(concentration)), "x_salt"]/massData.loc[(salt, float(concentration)), "x_LiPF6"]
-#         results.loc[(salt,float(concentration)), "d_n_salt/n_LiPF6"] = np.abs(1./massData.loc[(salt, float(concentration)), "x_LiPF6"]) * massData.loc[(salt, float(concentration)), "d_x_salt"] + \
-#                                                                         np.abs(-massData.loc[(salt, float(concentration)), "x_salt"]/((massData.loc[(salt, float(concentration)), "x_LiPF6"])**2.)) * massData.loc[(salt, float(concentration)), "d_x_LiPF6"]
-
-# # Save the results
-# results.to_csv('\\'.join(inputFileResults.split('\\')[0:-1] + [outputFileNameResults]), index=True, sep=";")  # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_csv.html
+VF, V_res = getVolFracs(mixingRatio={'LiPF6': 0.039, 'EC': 0.444, 'EMC': 0.166, 'DMC': 0.352})
+print(VF, V_res)
 
 # # # TODO: Move this fuction to compositionHandler.py
 # # def getVolFracs(fracs:tuple, labels:tuple, density:dict, molarMass:dict, mode:str="mole"):
@@ -380,33 +167,3 @@ def getStockSolutions(solutionconfig=conf['solutionHandler']):
 # #     for key in volFracs.keys():
 # #         volFracs[key] = np.nan_to_num(volFracs[key], nan=0.0)
 # #     return volFracs
-
-
-def getVolFracs(mixingRatio:dict, config:dict=conf['solutionHandler']):
-    ''' This function calculates the volume fractions for each solution in the reservoirs to obtain the correct mixing ratio requested or at least a mixture as similar as
-    possible. The composition of the mixture is entered as a dict of mole fractions.
-    input:
-    mixingRatio: dict of mole fractions for each chemical
-    config: dict containing the information regarding the available stock solutions
-    '''
-    ## Get the stock solutions
-    stockSolutions = getStockSolutions(solutionconfig=config)
-  
-    for stocksol in stockSolutions.keys():
-        sol = stockSolutions[stocksol]
-        sol.concentrations['LiPF6'] = sol.mix['LiPF6']['value']
-        ## Get the mass of 1L of the solution
-        m_1L = sol.density
-        ## Get the mass of the solvent by subtracting the mass of the concentration of the salt (the amount of salt in 1 L of the solution)
-        m_solv = m_1L - sol.mix['LiPF6']['value'] * sol.chemicals['LiPF6'].molarMass
-        ## Get the masses and the concentrations of the solvent components based on the solvent mass ratio
-        m_solvComp = {}
-        for c in sol.mix.keys():
-            if c != 'LiPF6':
-                m_solvComp[c] = sol.mix[c]['value'] * m_solv
-                sol.concentrations[c] = m_solvComp[c] / sol.chemicals[c].molarMass
-    
-    ## Assemble the linear system of equations
-    ## Get the matrix of stock solutions containing the concentrations of the components in one of the stock solutions as a column
-    # get the longest list of concentrations among the stock solutions
-    # concentrationArray = np.

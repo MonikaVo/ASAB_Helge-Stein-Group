@@ -17,12 +17,10 @@ app = FastAPI(title="CetoniDevice server V1.0",
             version="V1.0")
 
 @app.get("/action/CetoniDevice_action/mix")
-def mix(compounds: List[str] = Query([]), ratios: List[float] = Query([])):
-    if inputValidation(mix, compounds=compounds, ratios=ratios):
-        mixrat = dict(zip(compounds, ratios))
+def mix(chemicals: List[str] = Query([]), ratios: List[float] = Query([])):
+    if inputValidation(mix, chemicals=chemicals, ratios=ratios):
+        mixRatio = dict(zip(chemicals, ratios))
         assignment = conf["CetoniDevice"]["assignment"]
-        compoundsReservoirs = conf["CetoniDevice"]["compoundsReservoirs"]
-        mixRatio = dict([(compoundsReservoirs[compound], mixrat[compound]) for compound in mixrat.keys()])
         print(mixRatio)
         CetoniDevice_action.mix(mixRatio=mixRatio, assignment=assignment, pumps=Ps, valves=Vs)
 
@@ -58,9 +56,9 @@ if __name__ == "__main__":
 def inputValidation(function, **kwargs):
     if function.__name__ == "mix":
         try:
-            assert type(kwargs["compounds"]) == list, "The type of compounds is not correct." #done     # https://www.w3schools.com/python/ref_keyword_assert.asp
-            assert all(type(comp)==str for comp in kwargs["compounds"]), "The type of elements in compounds is not correct." #done
-            assert all([c in conf["CetoniDevice"]["compoundsReservoirs"].keys() for c in kwargs["compounds"]]), "One or more of the requested compounds are not available in the setup." #done
+            assert type(kwargs["chemicals"]) == list, "The type of compounds is not correct." #done     # https://www.w3schools.com/python/ref_keyword_assert.asp
+            assert all(type(chemical)==str for chemical in kwargs["chemicals"]), "The type of elements in compounds is not correct." #done
+            assert all([c in conf["CetoniDevice"]["stockSolutionsReservoirs"].keys() for c in kwargs["compounds"]]), "One or more of the requested compounds are not available in the setup." #done
             assert type(kwargs["ratios"]) == list, "The type of ratios is not correct." #done
             assert all(type(rat)==float for rat in kwargs["ratios"]), "The type of elements in ratios is not correct." #done
         except AssertionError:

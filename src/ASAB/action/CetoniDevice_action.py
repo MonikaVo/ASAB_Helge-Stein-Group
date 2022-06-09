@@ -8,6 +8,7 @@ except ImportError:
     conf = default_config.config
 
 from ASAB.configuration import config
+from ASAB.utility.solutionHandler import getVolFracs
 cf = config.configASAB
 
 ## Imports from ASAB
@@ -75,13 +76,16 @@ def mix(mixRatio:dict, pumps:dict, valves:dict, assignment:dict=conf["CetoniDevi
     # check setup
     setup = graph.getGraph(setup)
 
+    ## Convert the mixRatio to volume fractions
+    mixRatio = getVolFracs(mixingRatio=mixRatio)
+
     # Generate an assignment from reservoirs to pumps from the assignment of pumps to reservoirs
     revAssignment = dict(zip(assignment.values(), assignment.keys()))
     ## Determine the flows required to get the mixture
     # Initialize a dict of flows
     flows = {}
-    for reservoir in mixRatio.keys():
-        flows[reservoir] = mixRatio[reservoir]*flow
+    for sol in mixRatio.keys():
+        flows[revAssignment[sol]] = mixRatio[sol]*flow
     print(flows)
     # Get the pumps, which are related to the reservoirs in flow.keys()
     involvedPumps = [revAssignment[r] for r in flows.keys()]
