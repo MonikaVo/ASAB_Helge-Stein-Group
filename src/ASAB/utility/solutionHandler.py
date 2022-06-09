@@ -15,10 +15,10 @@ conf["solutionHandler"] = {'chemicals': [{'shortName': 'LiPF6', 'name': 'lithium
                                             {'shortName': 'EC', 'name': 'ethylene carbonate', 'molarMass': 88.06, 'molarMassUnit': 'g/mol'},
                                             {'shortName': 'EMC', 'name': 'ethyl methyl carbonate', 'molarMass': 104.10, 'molarMassUnit': 'g/mol'},
                                             {'shortName': 'DMC', 'name': 'dimethyl carbonate', 'molarMass': 90.08, 'molarMassUnit': 'g/mol'}],
-                            'solutions':[{'name': "LiPF6_salt_in_EC_DMC_1:1", 'mix': {'LiPF6': 1., 'EC': 1., 'DMC': 1.}, 'density': 1.2879, 'reservoir': 'Reservoir6'},
-                                        {'name': "EC_DMC_1:1", 'mix': {'EC': 1., 'DMC': 1.}, 'density': 1.2011, 'reservoir': 'Reservoir5'},
-                                        {'name': "LiPF6_salt_in_EC_EMC_3:7", 'mix': {'LiPF6': 1., 'EC': 1., 'EMC': 1.}, 'density': 1.1964, 'reservoir': 'Reservoir4'},
-                                        {'name': "EC_EMC_3:7", 'mix': {'EC': 1., 'EMC': 1.}, 'density': 1.1013, 'reservoir': 'Reservoir3'}]}
+                            'solutions':[{'name': "LiPF6_salt_in_EC_DMC_1:1", 'mix': {'LiPF6': {'value': 1., 'unit': 'mol/L'}, 'EC': {'value': 0.50, 'unit': 'g/g'}, 'DMC': {'value': 0.50, 'unit': 'g/g'}}, 'density': 1.2879, 'reservoir': 'Reservoir6'},
+                                        {'name': "EC_DMC_1:1", 'mix': {'EC': {'value': 0.50, 'unit': 'g/g'}, 'DMC': {'value': 0.50, 'unit': 'g/g'}}, 'density': 1.2011, 'reservoir': 'Reservoir5'},
+                                        {'name': "LiPF6_salt_in_EC_EMC_3:7", 'mix': {'LiPF6': {'value': 1., 'unit': 'mol/L'}, 'EC': {'value': 0.30, 'unit': 'g/g'}, 'EMC': {'value': 0.70, 'unit': 'g/g'}}, 'density': 1.1964, 'reservoir': 'Reservoir4'},
+                                        {'name': "EC_EMC_3:7", 'mix': {'EC': {'value': 0.30, 'unit': 'g/g'}, 'EMC': {'value': 0.70, 'unit': 'g/g'}}, 'density': 1.1013, 'reservoir': 'Reservoir3'}]}
 
 class Chemical:
     ''' This class describes a chemical with all its properties relevant to the ASAB system. '''
@@ -36,6 +36,7 @@ class Solution:
         self.mix = mix
         self.denisty = density
         self.reservoir = reservoir
+        self.concentrations = {}
 
 def getStockSolutions(solutionconfig=conf['solutionHandler']):
     ''' This function generates solutions based on the entries in the config file. '''
@@ -388,3 +389,24 @@ def getVolFracs(mixingRatio:dict, config:dict=conf['solutionHandler']):
     mixingRatio: dict of mole fractions for each chemical
     config: dict containing the information regarding the available stock solutions
     '''
+    ## Get the stock solutions
+    stockSolutions = getStockSolutions(solutionconfig=config)
+  
+    for stocksol in stockSolutions.keys():
+        sol = stockSolutions[stocksol]
+        sol.concentrations['LiPF6'] = sol.mix['LiPF6']['value']
+        ## Get the mass of 1L of the solution
+        m_1L = sol.density
+        ## Get the mass of the solvent by subtracting the mass of the concentration of the salt (the amount of salt in 1 L of the solution)
+        m_solv = m_1L - sol.mix['LiPF6']['value'] * sol.chemicals['LiPF6'].molarMass
+        ## Get the masses and the concentrations of the solvent components based on the solvent mass ratio
+        m_solvComp = {}
+        for c in sol.mix.keys():
+            if c != 'LiPF6':
+                m_solvComp[c] = sol.mix[c]['value'] * m_solv
+                sol.concentrations[c] = m_solvComp[c] / sol.chemicals[c].molarMass
+    
+    ## Assemble the linear system of equations
+    ## Get the matrix of stock solutions containing the concentrations of the components in one of the stock solutions as a column
+    # get the longest list of concentrations among the stock solutions
+    # concentrationArray = np.
