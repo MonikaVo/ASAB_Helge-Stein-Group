@@ -9,7 +9,7 @@
 
 import numpy as np
 import pandas as pd
-from scipy.optimize import nnls # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.nnls.html#scipy.optimize.nnls
+from scipy.optimize import minimize, nnls # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.nnls.html#scipy.optimize.nnls
 
 conf={}
 conf["solutionHandler"] = {'chemicals': [{'shortName': 'LiPF6', 'name': 'lithium hexafluorophosphate', 'molarMass': 151.90, 'molarMassUnit': 'g/mol'},
@@ -112,22 +112,38 @@ def getVolFracs(mixingRatio:dict, config:dict=conf['solutionHandler']):
     for item in chems:
         if not item in mixingRatio.keys():
             mixingRatio[item] = 0.0
-    targetComp = pd.Series(mixingRatio, name='target', index=mixingRatio.keys())
+    targetComp = pd.Series(mixingRatio, name='target', index=concentrationArray.index)
+    print(targetComp)
 
     ## Solve the system of linear equations; if an exact solution is not possible, which will be mostly the case, get a minimum 2-norm approximation   # -> https://numpy.org/doc/stable/reference/generated/numpy.linalg.lstsq.html
-    vols, vols_residual = nnls(np.array(concentrationArray), np.array(targetComp), maxiter=None)
-    # vols, vols_residuals, concentrationArray_rank, concentrationArray_singularValues = np.linalg.lstsq(np.array(concentrationArray), np.array(targetComp), rcond=None)
-    print('vols', vols)
-    volFracs = [(v/(np.sum(vols))) for v in vols]
+    
+    # vols, vols_residual = nnls(np.array(concentrationArray), np.array(targetComp), maxiter=None)
+    # # vols, vols_residuals, concentrationArray_rank, concentrationArray_singularValues = np.linalg.lstsq(np.array(concentrationArray), np.array(targetComp), rcond=None)
+    def lgs(x, A=concentrationArray, b=targetComp):
+        v = np.dot(A,x.T)
+        v_normalized = v / np.sum(v)
+        squaredError = np.sum((v_normalized - b)**2.)
+        return squaredError
+
+    startValues = [10.*targetComp['LiPF6'], targetComp['EC'], targetComp['DMC'], targetComp['EMC']]#np.full((len(stockSolutions.keys()),), 1./len(stockSolutions.keys()))
+    bounds = [(0,None) for i in range(len(startValues))]
+    vols = minimize(lgs, startValues, bounds=bounds)
+    volFracs = vols.x / (np.sum(vols.x))
+
+    # print('vols', vols)
+    # volFracs = vols / (np.sum(vols))
     print('volfracs', volFracs)
-    volFracs = pd.Series(volFracs, index=stockSolutions.keys())
+    volFracs = pd.Series(volFracs, index=concentrationArray.columns)
     volFracs = dict(volFracs)
-    return volFracs, vols_residual
+    return np.array(volFracs)
 
 S = getStockSolutions()
 
-VF, V_res = getVolFracs(mixingRatio={'LiPF6': 0.039, 'EC': 0.444, 'EMC': 0.166, 'DMC': 0.352})
-print(VF, V_res)
+#VF = getVolFracs(mixingRatio={'LiPF6': 0.09, 'EC': 0.03, 'EMC': 0.06, 'DMC': 0.0})
+
+
+VF = getVolFracs(mixingRatio={'LiPF6': 0.039, 'EC': 0.444, 'EMC': 0.166, 'DMC': 0.352})
+print(VF)
 
 # # # TODO: Move this fuction to compositionHandler.py
 # # def getVolFracs(fracs:tuple, labels:tuple, density:dict, molarMass:dict, mode:str="mole"):
