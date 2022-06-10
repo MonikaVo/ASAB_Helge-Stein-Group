@@ -33,7 +33,7 @@ def check(sampleName:str, checktype:str, method:str="Density"):
     ''' This function provides a functionality for automatically running nitrogen and hexane checks. '''
     # TODO: Test this function!!!
     ## Check the input types
-    inputTypes = {'sampleName': str, 'checkType': str, 'method': str}
+    inputTypes = {'sampleName': str, 'checktype': str, 'method': str}
     inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
     typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
 
@@ -45,6 +45,7 @@ def check(sampleName:str, checktype:str, method:str="Density"):
 
 def retrieveData(sampleName:str, method:str, methodtype:str, savePath:str):
     ''' This funciton retrieves data from density and viscosity measurements and saves them in a dict data format to a .json file in the specified folder (savePath). '''
+    # TODO: Adjust for retrieval of checks. They have other fields.
     ## Check the input types
     inputTypes = {'sampleName': str, 'method': str, 'methodtype': str, 'savePath': str}
     inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary

@@ -65,7 +65,7 @@ def flushSyringe(pumps:dict, valves:dict, pump:str, reservoir:str, waste:str=con
         # Wait until the pump has finished pumping
         timer.wait_until(pumps[pump].is_pumping, False)
 
-def mix(mixRatio:dict, pumps:dict, valves:dict, assignment:dict=conf["CetoniDevice"]["assignment"], waste:str=conf["CetoniDevice"]["waste"], gas:str=conf["CetoniDevice"]["gas"], setup:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], flow:float=conf["CetoniDeviceDriver"]["flow"]):
+def mix(mixRatio:dict, pumps:dict, valves:dict, assignment:dict=conf["CetoniDevice"]["assignment"], stockSolutionsReservoirs:dict=conf["CetoniDevice"]["stockSolutionsReservoirs"], waste:str=conf["CetoniDevice"]["waste"], gas:str=conf["CetoniDevice"]["gas"], setup:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], flow:float=conf["CetoniDeviceDriver"]["flow"]):
     ''' This function mixes from reservoirs according to the given mixing ratio. The mixing ratio must be given as volume fractions for the solution in each reservoir.
     mixRatio = {"Reservoi1": 0.2, "Reservoir2": 0.8}'''
 
@@ -76,6 +76,7 @@ def mix(mixRatio:dict, pumps:dict, valves:dict, assignment:dict=conf["CetoniDevi
     # check setup
     setup = graph.getGraph(setup)
 
+    print('MIXINGRATIO', mixRatio)
     ## Convert the mixRatio to volume fractions
     mixRatio = getVolFracs(mixingRatio=mixRatio)
 
@@ -85,10 +86,11 @@ def mix(mixRatio:dict, pumps:dict, valves:dict, assignment:dict=conf["CetoniDevi
     # Initialize a dict of flows
     flows = {}
     for sol in mixRatio.keys():
-        flows[revAssignment[sol]] = mixRatio[sol]*flow
+        flows[stockSolutionsReservoirs[sol]] = mixRatio[sol]*flow
     print(flows)
     # Get the pumps, which are related to the reservoirs in flow.keys()
-    involvedPumps = [revAssignment[r] for r in flows.keys()]
+    involvedPumps = [revAssignment[r] for r in flows.keys() if flows[r] != 0.0]
+    print(involvedPumps)
 
     ## Fill each of the involved syringes with the respective fluid
     # Collect the dead volume of each path to the waste in dV
@@ -121,6 +123,7 @@ def mix(mixRatio:dict, pumps:dict, valves:dict, assignment:dict=conf["CetoniDevi
     # Wait until dV_max is pumped two times with flow
     timer2 = qmixbus.PollingTimer(period_ms = (2.*dV_max/flow)*1000.)
     timer2.wait_until(timer2.is_expired, True)
+    return mixRatio#, deviation
 
 
 def provideSample(measurementtype:str, sample_node:str, pumps:dict, valves:dict, waste:str=conf["CetoniDevice"]["waste"]):
@@ -159,6 +162,32 @@ def provideSample(measurementtype:str, sample_node:str, pumps:dict, valves:dict,
     CetoniDevice_driver.pumpObj.stop_all_pumps()
     ## Wait a while for the liquid to get stable
     time.sleep(10)
+
+def drainSample(measurementtype:str, pump:str, repeats:int, pumps:dict, valves:dict, gas:str=conf["CetoniDevice"]["gas"], waste:str=conf["CetoniDevice"]["waste"], flow:float=conf["CetoniDeviceDriver"]["flow"]):
+    ''' This function drains the sample from a device to the waste after measurement. '''
+    # TODO: Test this function
+
+    # find a path from gas to pump
+    pathGP = graph.findPath(start_node=gas, end_node=pump)
+    # find a path from the pump to through the device to the waste
+    pathPW = graph.findPath(start_node=pump, end_node=waste, via=[f'{measurementtype}IN', f'{measurementtype}OUT'])
+    # repeat n times
+    for n in range(repeats):
+        # switch valves to pathGP
+        switchValves(nodelist=pathGP, valvesDict=valves)
+
+        # aspirate the maximum volume of gas to the pump
+        pumps[pump].set_fill_level(pumps[pump].get_volume_max(), flow)
+        # wait for the pump to finish pumping
+        timer = PollingTimer(period_ms=300000)
+        timer.wait_until(pumps[pump].is_pumping, False)
+        # switch the valves to pathPW
+        switchValves(nodelist=pathPW, valvesDict=valves)
+        # dispense the gas
+        pumps[pump].set_fill_level(0.0, flow)
+        # wait for the pump to finish pumping
+        timer = PollingTimer(period_ms=300000)
+        timer.wait_until(pumps[pump].is_pumping, False)
 
 def cleanPath(path:list, pumpsDict:dict, mediumReservoir:str=conf["CetoniDevice"]["gas"], waste:str=conf["CetoniDevice"]["waste"], flow:float=conf["CetoniDeviceDriver"]["flow"], repeats:int=3):
     ''' This function cleans a path entered as a list of nodes using the medium provided in the mediumReservoir. '''
@@ -401,6 +430,7 @@ def fillSyringe(pump:pumpObj, volume:float, valvesDict:dict, reservoir:str, wast
         # If the syringe is not large enough, use the full volume of the syringe
         vol = pump.get_volume_max()
         print("Volume max", vol)
+    # TODO: enter here to add a while loop for the final volume < vol-tolerance
     # Find a path from the reservoir to the pump
     pathRP = graph.findPath(start_node=reservoir, end_node=pump.name, valvePositionDict=valvePositionDict, graph=setup)
     # Switch the valves according to pathRP
@@ -422,14 +452,6 @@ def fillSyringe(pump:pumpObj, volume:float, valvesDict:dict, reservoir:str, wast
     # Dispense two times the dead volume of the path to the waste
     new_level = currentVol - 2.0*graph.getTotalQuantity(nodelist=pathPW, quantity="dead_volume")
     print(new_level)
-    
-
-    # # FIXME: Not valid for the general case. Only for checkDefinition application
-    # if new_level < 0:
-    #     new_level = currentVol
-
-
-
     pump.set_fill_level(level=new_level, flow=flow)
     # Wait until the pump has finished pumping
     print("Waiting2")
@@ -448,7 +470,7 @@ def fillSyringe(pump:pumpObj, volume:float, valvesDict:dict, reservoir:str, wast
     pump.set_fill_level(level=limit_level, flow=flow)
     # While the pump is pumping
     while pump.is_pumping():
-        while len(readingsBalance) < 10:
+        while len(readingsBalance) < 30:
             # Read the balance
             currentMass = balance_action.readBalance(bal)
             # Add the new value to the list of readings
@@ -458,7 +480,7 @@ def fillSyringe(pump:pumpObj, volume:float, valvesDict:dict, reservoir:str, wast
         # Add the new value to the list of readings
         readingsBalance.append(currentMass)
         # Determine the gradient in a linear fit
-        gradient = np.polyfit(x=range(10),y=readingsBalance[-10::],deg=1)[0]  #https://numpy.org/doc/stable/reference/generated/numpy.polyfit.html
+        gradient = np.polyfit(x=range(30),y=readingsBalance[-30::],deg=1)[0]  #https://numpy.org/doc/stable/reference/generated/numpy.polyfit.html
         print(gradient)
         # Check, if the gradient exceeds a threshold
         if gradient>0.003:

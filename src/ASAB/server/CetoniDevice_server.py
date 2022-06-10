@@ -17,16 +17,18 @@ app = FastAPI(title="CetoniDevice server V1.0",
             version="V1.0")
 
 @app.get("/action/CetoniDevice_action/mix")
-def mix(chemicals: List[str] = Query([]), ratios: List[float] = Query([])):
-    if inputValidation(mix, chemicals=chemicals, ratios=ratios):
-        mixRatio = dict(zip(chemicals, ratios))
+def mix(mixratios:str =List[tuple]):#: List[str] = Query([]), ratios: List[float] = Query([])):
+    if True:#inputValidation(mix, chemicals=chemicals, ratios=ratios):
+        print(mixratios)
+        mixRatio = eval(mixratios)# = dict(zip(chemicals, ratios))
+        print('mixratioDict', mixRatio)
         assignment = conf["CetoniDevice"]["assignment"]
-        print(mixRatio)
-        CetoniDevice_action.mix(mixRatio=mixRatio, assignment=assignment, pumps=Ps, valves=Vs)
+        mixrat = CetoniDevice_action.mix(mixRatio=mixRatio, assignment=assignment, pumps=Ps, valves=Vs)
+        return mixrat
 
 @app.get("/action/CetoniDevice_action/provideSample")
 def provideSample(measurementtype:str, sample_node:str):
-    if inputValidation(provideSample, measurementtype=measurementtype, sample_node=sample_node):
+    if True:# inputValidation(provideSample, measurementtype=measurementtype, sample_node=sample_node):
         CetoniDevice_action.provideSample(measurementtype=measurementtype, sample_node=sample_node, pumps=Ps, valves=Vs)
 
 @app.on_event("shutdown")
@@ -48,7 +50,7 @@ if __name__ == "__main__":
 
 # TODO:
 # - get emergency button (stop all pumps IMMEDIATELY)
-# - check, if the requested compounds are available -> done
+# - check, if the requested chemicals are available -> done
 # - check, if the requested flow of each compound can be supplied for a reasonable amount of time with the syringes equipped
 # - check, if the required flows are above the minimum flow and below the maximum flow of the respective syringes
 # - check, if the requested device is available -> done
@@ -56,9 +58,9 @@ if __name__ == "__main__":
 def inputValidation(function, **kwargs):
     if function.__name__ == "mix":
         try:
-            assert type(kwargs["chemicals"]) == list, "The type of compounds is not correct." #done     # https://www.w3schools.com/python/ref_keyword_assert.asp
-            assert all(type(chemical)==str for chemical in kwargs["chemicals"]), "The type of elements in compounds is not correct." #done
-            assert all([c in conf["CetoniDevice"]["stockSolutionsReservoirs"].keys() for c in kwargs["compounds"]]), "One or more of the requested compounds are not available in the setup." #done
+            assert type(kwargs["chemicals"]) == list, "The type of chemicals is not correct." #done     # https://www.w3schools.com/python/ref_keyword_assert.asp
+            assert all(type(chemical)==str for chemical in kwargs["chemicals"]), "The type of elements in chemicals is not correct." #done
+            assert all([c in conf["CetoniDevice"]["stockSolutionsReservoirs"].keys() for c in kwargs["chemicals"]]), "One or more of the requested chemicals are not available in the setup." #done
             assert type(kwargs["ratios"]) == list, "The type of ratios is not correct." #done
             assert all(type(rat)==float for rat in kwargs["ratios"]), "The type of elements in ratios is not correct." #done
         except AssertionError:

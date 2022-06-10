@@ -1,25 +1,25 @@
-# ## Get the configuration
-# try:
-#     # if there is a main file, get conf from there
-#     from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
-# except ImportError:
-#     # if the import was not successful, go to default config
-#     from ASAB.configuration import default_config
-#     conf = default_config.config
+## Get the configuration
+try:
+    # if there is a main file, get conf from there
+    from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
+except ImportError:
+    # if the import was not successful, go to default config
+    from ASAB.configuration import default_config
+    conf = default_config.config
 
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize, nnls # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.nnls.html#scipy.optimize.nnls
 
-conf={}
-conf["solutionHandler"] = {'chemicals': [{'shortName': 'LiPF6', 'name': 'lithium hexafluorophosphate', 'molarMass': 151.90, 'molarMassUnit': 'g/mol'},
-                                            {'shortName': 'EC', 'name': 'ethylene carbonate', 'molarMass': 88.06, 'molarMassUnit': 'g/mol'},
-                                            {'shortName': 'EMC', 'name': 'ethyl methyl carbonate', 'molarMass': 104.10, 'molarMassUnit': 'g/mol'},
-                                            {'shortName': 'DMC', 'name': 'dimethyl carbonate', 'molarMass': 90.08, 'molarMassUnit': 'g/mol'}],
-                            'solutions':[{'name': "LiPF6_salt_in_EC_DMC_1:1", 'mix': {'LiPF6': {'value': 1., 'unit': 'mol/L'}, 'EC': {'value': 0.50, 'unit': 'g/g'}, 'DMC': {'value': 0.50, 'unit': 'g/g'}}, 'density': 1.2879, 'reservoir': 'Reservoir6'},
-                                        {'name': "EC_DMC_1:1", 'mix': {'EC': {'value': 0.50, 'unit': 'g/g'}, 'DMC': {'value': 0.50, 'unit': 'g/g'}}, 'density': 1.2011, 'reservoir': 'Reservoir5'},
-                                        {'name': "LiPF6_salt_in_EC_EMC_3:7", 'mix': {'LiPF6': {'value': 1., 'unit': 'mol/L'}, 'EC': {'value': 0.30, 'unit': 'g/g'}, 'EMC': {'value': 0.70, 'unit': 'g/g'}}, 'density': 1.1964, 'reservoir': 'Reservoir4'},
-                                        {'name': "EC_EMC_3:7", 'mix': {'EC': {'value': 0.30, 'unit': 'g/g'}, 'EMC': {'value': 0.70, 'unit': 'g/g'}}, 'density': 1.1013, 'reservoir': 'Reservoir3'}]}
+# conf={}
+# conf["solutionHandler"] = {'chemicals': [{'shortName': 'LiPF6', 'name': 'lithium hexafluorophosphate', 'molarMass': 151.90, 'molarMassUnit': 'g/mol'},
+#                                             {'shortName': 'EC', 'name': 'ethylene carbonate', 'molarMass': 88.06, 'molarMassUnit': 'g/mol'},
+#                                             {'shortName': 'EMC', 'name': 'ethyl methyl carbonate', 'molarMass': 104.10, 'molarMassUnit': 'g/mol'},
+#                                             {'shortName': 'DMC', 'name': 'dimethyl carbonate', 'molarMass': 90.08, 'molarMassUnit': 'g/mol'}],
+#                             'solutions':[{'name': "LiPF6_salt_in_EC_DMC_1:1", 'mix': {'LiPF6': {'value': 1., 'unit': 'mol/L'}, 'EC': {'value': 0.50, 'unit': 'g/g'}, 'DMC': {'value': 0.50, 'unit': 'g/g'}}, 'density': 1.2879, 'reservoir': 'Reservoir6'},
+#                                         {'name': "EC_DMC_1:1", 'mix': {'EC': {'value': 0.50, 'unit': 'g/g'}, 'DMC': {'value': 0.50, 'unit': 'g/g'}}, 'density': 1.2011, 'reservoir': 'Reservoir5'},
+#                                         {'name': "LiPF6_salt_in_EC_EMC_3:7", 'mix': {'LiPF6': {'value': 1., 'unit': 'mol/L'}, 'EC': {'value': 0.30, 'unit': 'g/g'}, 'EMC': {'value': 0.70, 'unit': 'g/g'}}, 'density': 1.1964, 'reservoir': 'Reservoir4'},
+#                                         {'name': "EC_EMC_3:7", 'mix': {'EC': {'value': 0.30, 'unit': 'g/g'}, 'EMC': {'value': 0.70, 'unit': 'g/g'}}, 'density': 1.1013, 'reservoir': 'Reservoir3'}]}
 
 class Chemical:
     ''' This class describes a chemical with all its properties relevant to the ASAB system. '''
@@ -55,7 +55,7 @@ def getVolFracs(mixingRatio:dict, config:dict=conf['solutionHandler']):
     ''' This function calculates the volume fractions for each solution in the reservoirs to obtain the correct mixing ratio requested or at least a mixture as similar as
     possible. The composition of the mixture is entered as a dict of mole fractions. Mixing volumes are disregarded.
     input:
-    mixingRatio: dict of mole fractions for each chemical
+    mixingRatio: dict of mole fractions for each chemical, chemicals are keys, ratios are values
     config: dict containing the information regarding the available stock solutions
 
     output:
@@ -66,7 +66,7 @@ def getVolFracs(mixingRatio:dict, config:dict=conf['solutionHandler']):
     stockSolutions = getStockSolutions(solutionconfig=config)
   
     for stocksol in stockSolutions.keys():
-        print(stocksol)
+        print('stockSolutions', stocksol)
         sol = stockSolutions[stocksol]
         ## Get the mass of 1L of the solution, factor 1000, because density is expected to be given in the unit g/cm^3
         m_1L = sol.density * 1000.
@@ -83,10 +83,6 @@ def getVolFracs(mixingRatio:dict, config:dict=conf['solutionHandler']):
             if c != 'LiPF6':
                 m_solvComp[c] = sol.mix[c]['value'] * m_solv
                 sol.concentrations[c] = m_solvComp[c] / sol.chemicals[c].molarMass
-        # totalMolPerLiter = np.sum(list(sol.concentrations.values()))
-        # for c in sol.concentrations.keys():
-        #     sol.concentrations[c] = sol.concentrations[c] / totalMolPerLiter
-        # print(sol.concentrations)
     
     ## Assemble the linear system of equations
     ## Get the matrix of stock solutions containing the concentrations of the chemicals in one of the stock solutions as a column
@@ -117,10 +113,8 @@ def getVolFracs(mixingRatio:dict, config:dict=conf['solutionHandler']):
 
     ## Solve the system of linear equations; if an exact solution is not possible, which will be mostly the case, get a minimum 2-norm approximation   # -> https://numpy.org/doc/stable/reference/generated/numpy.linalg.lstsq.html
     
-    # vols, vols_residual = nnls(np.array(concentrationArray), np.array(targetComp), maxiter=None)
-    # # vols, vols_residuals, concentrationArray_rank, concentrationArray_singularValues = np.linalg.lstsq(np.array(concentrationArray), np.array(targetComp), rcond=None)
     def lgs(x, A=concentrationArray, b=targetComp):
-        v = np.dot(A,x.T)
+        v = np.dot(A,x)
         v_normalized = v / np.sum(v)
         squaredError = np.sum((v_normalized - b)**2.)
         return squaredError
@@ -134,16 +128,25 @@ def getVolFracs(mixingRatio:dict, config:dict=conf['solutionHandler']):
     # volFracs = vols / (np.sum(vols))
     print('volfracs', volFracs)
     volFracs = pd.Series(volFracs, index=concentrationArray.columns)
+
+    # deviationFromTarget = np.dot(concentrationArray * vols) / np.sum(np.dot(concentrationArray * vols)) - targetComp
+    # print(deviationFromTarget)
+    # deviationFromTarget_series = pd.Series(deviationFromTarget, index=concentrationArray.index)
+
     volFracs = dict(volFracs)
-    return np.array(volFracs)
-
-S = getStockSolutions()
-
-#VF = getVolFracs(mixingRatio={'LiPF6': 0.09, 'EC': 0.03, 'EMC': 0.06, 'DMC': 0.0})
+    print(volFracs)
+    # deviationFromTarget = dict(deviationFromTarget_series)
+    return volFracs#, deviationFromTarget
 
 
-VF = getVolFracs(mixingRatio={'LiPF6': 0.039, 'EC': 0.444, 'EMC': 0.166, 'DMC': 0.352})
-print(VF)
+if __name__ == '__main__':
+    S = getStockSolutions()
+
+    VF = getVolFracs(mixingRatio={'LiPF6': 0.032, 'EC': 0.398, 'DMC': 0.212, 'EMC': 0.357})
+
+
+    VF = getVolFracs(mixingRatio={'LiPF6': 0.039, 'EC': 0.444, 'EMC': 0.166, 'DMC': 0.352})
+    print(VF)
 
 # # # TODO: Move this fuction to compositionHandler.py
 # # def getVolFracs(fracs:tuple, labels:tuple, density:dict, molarMass:dict, mode:str="mole"):
