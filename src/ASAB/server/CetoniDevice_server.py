@@ -55,6 +55,7 @@ if __name__ == "__main__":
 # - check, if the required flows are above the minimum flow and below the maximum flow of the respective syringes
 # - check, if the requested device is available -> done
 
+# TODO: Fix type checks
 def inputValidation(function, **kwargs):
     if function.__name__ == "mix":
         try:

@@ -33,7 +33,8 @@ def retrieveData(sampleName:str, method:str, methodtype:str, savePath:str):
     typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
 
     result = densioVisco_action.retrieveData(sampleName=sampleName, method=method, methodtype=methodtype, savePath=savePath)
-    return result
+    # TODO: Return something else than str
+    return str(result)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="<host IP>", port="<port>") # edited prior to publication

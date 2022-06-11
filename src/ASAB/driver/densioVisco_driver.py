@@ -68,13 +68,12 @@ def retrieveData(sampleName:str, method:str, methodtype:str, savePath:str):
                         "values": list(data.loc[data["Results::Measurement Level"]!="Master", "Results::Lovis Dyn. Viscosity"].values[1:])}}
     for key, value in extractedData.items():
         if key != "sampleName":
-            #print("key:", key, "val:", value)
             try:
                 # Get floats for the values
                 values = np.array(value["values"], dtype=np.float64)
             except ValueError:
                 # If not all values can be casted to float
-                values = []
+                values = np.full((len(value['values']),), np.NaN)
                 # Iterate over all values
                 for i in range(len(value["values"])):
                     # Try to convert each value to float
@@ -83,23 +82,21 @@ def retrieveData(sampleName:str, method:str, methodtype:str, savePath:str):
                     # if the conversion fails
                     except ValueError:
                         # check, if the value is ---
-                        if value["values"][i] == "---":
+                        if value["values"][i].encode('ascii', 'ignore') == b'':
                             # if so, replace it by NaN
                             values[i] = np.NaN
-            try:
-                # Mark the values according to their validity
-                markedValues = np.ma.masked_array(values, mask=[stat != "valid" for stat in value["status"]])
-                # Replace the invalid values by np.NaN
-                markedValues[markedValues.mask] = np.NaN
-                # Assign processed values to the extractedData
-                extractedData2 = extractedData.copy()
-                extractedData2[key]["status"] = list(markedValues.data)
-                # Add the quality to the extractedData
-                extractedData2[key]["quality"] = 10. - (np.sum(markedValues.mask)/float(len(value["values"])))
-            except np.ma.core.MaskError:
-                extractedData2 = extractedData.copy()
-    with open(f"{savePath}\\{sampleName}_raw.json", "w") as file:
+            # try:
+            # Mark the values according to their validity
+            markedValues = np.ma.masked_array(values, mask=[stat != "valid" for stat in value["status"]])
+            # Replace the invalid values by np.NaN
+            markedValues[markedValues.mask] = np.NaN
+            # Assign processed values to the extractedData
+            extractedData2 = extractedData.copy()
+            extractedData2[key]["values"] = list(markedValues.data)
+            # Add the quality to the extractedData
+            extractedData2[key]["quality"] = 10. - (np.sum(markedValues.mask)/float(len(value["values"])))
+    with open(f"{savePath}\\{sampleName}_raw.txt", "w") as file:
         file.write(str(extractedData))   # https://stackoverflow.com/questions/29223246/how-do-i-save-data-in-a-text-file-python
-    with open(f"{savePath}\\{sampleName}_result.json", "w") as file:
+    with open(f"{savePath}\\{sampleName}_result.txt", "w") as file:
         file.write(str(extractedData2))
     return extractedData2

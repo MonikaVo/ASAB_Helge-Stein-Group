@@ -30,4 +30,5 @@ def retrieveData(sampleName:str, method:str, methodtype:str, savePath:str):
     inputTypes = {'sampleName': str, 'method': str, 'methodtype':str, 'savePath':str}
     inputObjects = dict(**locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
     typeCheck(inputObjects=inputObjects, inputTypes=inputTypes)
-    densioVisco_driver.retrieveData(sampleName=sampleName, method=method, methodtype=methodtype, savePath=savePath)
+    results = densioVisco_driver.retrieveData(sampleName=sampleName, method=method, methodtype=methodtype, savePath=savePath)
+    return results
