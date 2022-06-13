@@ -78,7 +78,7 @@ def mix(mixRatio:dict, pumps:dict, valves:dict, assignment:dict=conf["CetoniDevi
 
     print('MIXINGRATIO', mixRatio)
     ## Convert the mixRatio to volume fractions
-    mixRatio = getVolFracs(mixingRatio=mixRatio)
+    mixRatio, actualMix = getVolFracs(mixingRatio=mixRatio)
 
     # Generate an assignment from reservoirs to pumps from the assignment of pumps to reservoirs
     revAssignment = dict(zip(assignment.values(), assignment.keys()))
@@ -123,7 +123,7 @@ def mix(mixRatio:dict, pumps:dict, valves:dict, assignment:dict=conf["CetoniDevi
     # Wait until dV_max is pumped two times with flow
     timer2 = qmixbus.PollingTimer(period_ms = (2.*dV_max/flow)*1000.)
     timer2.wait_until(timer2.is_expired, True)
-    return mixRatio#, deviation
+    return mixRatio, actualMix#, deviation
 
 
 def provideSample(measurementtype:str, sample_node:str, pumps:dict, valves:dict, waste:str=conf["CetoniDevice"]["waste"]):
@@ -148,13 +148,13 @@ def provideSample(measurementtype:str, sample_node:str, pumps:dict, valves:dict,
         print("ERROR: The total path is not valid.")
     ## Wait until the volume required for the measurement is pumped 1.5 times or the first pump stops pumping and stop the flow
     # Initialize a timer
-    timer = qmixbus.PollingTimer(period_ms = 1.2 * 1000. *((graph.getTotalQuantity(nodelist=pathSIN, quantity="dead_volume") + conf["CetoniDevice"]["measureVolumes"][measurementtype])/conf["CetoniDeviceDriver"]["flow"]))
+    timer = qmixbus.PollingTimer(period_ms = 1000. *((graph.getTotalQuantity(nodelist=pathSIN, quantity="dead_volume") + conf["CetoniDevice"]["measureVolumes"][measurementtype])/conf["CetoniDeviceDriver"]["flow"]))
     print("volume to be pumped: ", graph.getTotalQuantity(nodelist=pathSIN, quantity="dead_volume") + conf["CetoniDevice"]["measureVolumes"][measurementtype])
     print(f"time to be waited: {timer.get_msecs_to_expiration()/1000.} s, {timer.get_msecs_to_expiration()/60000.} min")
     # Get the currently pumping pumps
     pumpingPs = CetoniDevice_driver.cetoni.pumpingPumps(pumpsDict = pumps)
     # Wait and check the two conditions
-    while not timer.is_expired() and pumpingPs == CetoniDevice_driver.cetoni.pumpingPumps(pumpsDict=pumps):
+    while (not timer.is_expired()) and (pumpingPs == CetoniDevice_driver.cetoni.pumpingPumps(pumpsDict=pumps)):
         time.sleep(0.1)
     # # Wait
     # timer.wait_until(timer.is_expired, True)

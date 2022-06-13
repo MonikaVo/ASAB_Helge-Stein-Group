@@ -82,7 +82,7 @@ def retrieveData(sampleName:str, method:str, methodtype:str, savePath:str):
                     # if the conversion fails
                     except ValueError:
                         # check, if the value is ---
-                        if value["values"][i].encode('ascii', 'ignore') == b'':
+                        if value["values"][i].encode('ascii', 'ignore') == b'': # https://www.w3schools.com/python/ref_string_encode.asp
                             # if so, replace it by NaN
                             values[i] = np.NaN
             # try:
@@ -95,8 +95,8 @@ def retrieveData(sampleName:str, method:str, methodtype:str, savePath:str):
             extractedData2[key]["values"] = list(markedValues.data)
             # Add the quality to the extractedData
             extractedData2[key]["quality"] = 10. - (np.sum(markedValues.mask)/float(len(value["values"])))
-    with open(f"{savePath}\\{sampleName}_raw.txt", "w") as file:
+    with open(f"{savePath}\\{sampleName}_raw.json", "w") as file:
         file.write(str(extractedData))   # https://stackoverflow.com/questions/29223246/how-do-i-save-data-in-a-text-file-python
-    with open(f"{savePath}\\{sampleName}_result.txt", "w") as file:
+    with open(f"{savePath}\\{sampleName}_result.json", "w") as file:
         file.write(str(extractedData2))
     return extractedData2

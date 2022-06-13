@@ -114,7 +114,7 @@ def getVolFracs(mixingRatio:dict, config:dict=conf['solutionHandler']):
     ## Solve the system of linear equations; if an exact solution is not possible, which will be mostly the case, get a minimum 2-norm approximation   # -> https://numpy.org/doc/stable/reference/generated/numpy.linalg.lstsq.html
     
     def lgs(x, A=concentrationArray, b=targetComp):
-        v = np.dot(A,x)
+        v = np.dot(A, x)
         v_normalized = v / np.sum(v)
         squaredError = np.sum((v_normalized - b)**2.)
         return squaredError
@@ -129,14 +129,14 @@ def getVolFracs(mixingRatio:dict, config:dict=conf['solutionHandler']):
     print('volfracs', volFracs)
     volFracs = pd.Series(volFracs, index=concentrationArray.columns)
 
-    # deviationFromTarget = np.dot(concentrationArray * vols) / np.sum(np.dot(concentrationArray * vols)) - targetComp
-    # print(deviationFromTarget)
-    # deviationFromTarget_series = pd.Series(deviationFromTarget, index=concentrationArray.index)
+    actualAmounts = np.dot(concentrationArray, vols.x)
+    actualMix = actualAmounts / np.sum(actualAmounts)
+    actualMix = pd.Series(actualMix)
+    actualMix = dict(actualMix)
 
     volFracs = dict(volFracs)
     print(volFracs)
-    # deviationFromTarget = dict(deviationFromTarget_series)
-    return volFracs#, deviationFromTarget
+    return volFracs, actualMix
 
 
 if __name__ == '__main__':
