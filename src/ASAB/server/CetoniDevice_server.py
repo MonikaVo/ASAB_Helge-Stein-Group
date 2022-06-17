@@ -23,13 +23,18 @@ def mix(mixratios:str =List[tuple]):#: List[str] = Query([]), ratios: List[float
         mixRatio = eval(mixratios)# = dict(zip(chemicals, ratios))
         print('mixratioDict', mixRatio)
         assignment = conf["CetoniDevice"]["assignment"]
-        mixrat = CetoniDevice_action.mix(mixRatio=mixRatio, assignment=assignment, pumps=Ps, valves=Vs)
-        return mixrat
+        mixrat, actualMix = CetoniDevice_action.mix(mixRatio=mixRatio, assignment=assignment, pumps=Ps, valves=Vs, via=['V8.0'])
+        return mixrat, actualMix
 
 @app.get("/action/CetoniDevice_action/provideSample")
 def provideSample(measurementtype:str, sample_node:str):
     if True:# inputValidation(provideSample, measurementtype=measurementtype, sample_node=sample_node):
         CetoniDevice_action.provideSample(measurementtype=measurementtype, sample_node=sample_node, pumps=Ps, valves=Vs)
+
+@app.get("/action/CetoniDevice_action/drainSample")
+def drainSample(measurementtype:str, pump:str, repeats:int):
+    if True:# TODO: add working input validation here.
+        CetoniDevice_action.drainSample(measurementtype=measurementtype, pump=pump, repeats=repeats, pumps=Ps, valves=Vs)
 
 @app.on_event("shutdown")
 def quitCetoni():

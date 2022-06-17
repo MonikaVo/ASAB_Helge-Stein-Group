@@ -66,7 +66,6 @@ def getVolFracs(mixingRatio:dict, config:dict=conf['solutionHandler']):
     stockSolutions = getStockSolutions(solutionconfig=config)
   
     for stocksol in stockSolutions.keys():
-        print('stockSolutions', stocksol)
         sol = stockSolutions[stocksol]
         ## Get the mass of 1L of the solution, factor 1000, because density is expected to be given in the unit g/cm^3
         m_1L = sol.density * 1000.
@@ -100,7 +99,6 @@ def getVolFracs(mixingRatio:dict, config:dict=conf['solutionHandler']):
     for s in stockSolutions.values():
         for ch, c in s.concentrations.items():
             concentrationArray.loc[ch, s.name] = c
-    print('C_Array', concentrationArray)
     
     
     ## Assemble vector representing the target composition
@@ -109,7 +107,6 @@ def getVolFracs(mixingRatio:dict, config:dict=conf['solutionHandler']):
         if not item in mixingRatio.keys():
             mixingRatio[item] = 0.0
     targetComp = pd.Series(mixingRatio, name='target', index=concentrationArray.index)
-    print(targetComp)
 
     ## Solve the system of linear equations; if an exact solution is not possible, which will be mostly the case, get a minimum 2-norm approximation   # -> https://numpy.org/doc/stable/reference/generated/numpy.linalg.lstsq.html
     
@@ -119,23 +116,22 @@ def getVolFracs(mixingRatio:dict, config:dict=conf['solutionHandler']):
         squaredError = np.sum((v_normalized - b)**2.)
         return squaredError
 
-    startValues = [10.*targetComp['LiPF6'], targetComp['EC'], targetComp['DMC'], targetComp['EMC']]#np.full((len(stockSolutions.keys()),), 1./len(stockSolutions.keys()))
+    startValues = [10.*targetComp['LiPF6'], targetComp['DMC'], 10.*targetComp['LiPF6'], targetComp['EMC']]#np.full((len(stockSolutions.keys()),), 1./len(stockSolutions.keys()))
     bounds = [(0,None) for i in range(len(startValues))]
     vols = minimize(lgs, startValues, bounds=bounds)
     volFracs = vols.x / (np.sum(vols.x))
 
-    # print('vols', vols)
-    # volFracs = vols / (np.sum(vols))
-    print('volfracs', volFracs)
     volFracs = pd.Series(volFracs, index=concentrationArray.columns)
 
     actualAmounts = np.dot(concentrationArray, vols.x)
     actualMix = actualAmounts / np.sum(actualAmounts)
-    actualMix = pd.Series(actualMix)
+    actualMix = pd.Series(actualMix, index=concentrationArray.index)
     actualMix = dict(actualMix)
 
     volFracs = dict(volFracs)
-    print(volFracs)
+
+    print('volFracs', volFracs)
+    print('actualMix', actualMix)
     return volFracs, actualMix
 
 

@@ -94,7 +94,9 @@ def retrieveData(sampleName:str, method:str, methodtype:str, savePath:str):
             extractedData2 = extractedData.copy()
             extractedData2[key]["values"] = list(markedValues.data)
             # Add the quality to the extractedData
-            extractedData2[key]["quality"] = 10. - (np.sum(markedValues.mask)/float(len(value["values"])))
+            extractedData2[key]["quality"] = 10. - ((np.sum(markedValues.mask)/float(len(value["values"]))) * 10.)
+            print('reductionQuality:', (np.sum(markedValues.mask)/float(len(value["values"]))) * 10.)
+            print('sumMask:', np.sum(markedValues.mask))
     with open(f"{savePath}\\{sampleName}_raw.json", "w") as file:
         file.write(str(extractedData))   # https://stackoverflow.com/questions/29223246/how-do-i-save-data-in-a-text-file-python
     with open(f"{savePath}\\{sampleName}_result.json", "w") as file:

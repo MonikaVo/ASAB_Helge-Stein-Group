@@ -7,6 +7,7 @@ except ImportError:
     from ASAB.configuration import default_config
     conf = default_config.config
 
+from platform import node
 from ASAB.configuration import config
 from ASAB.utility.solutionHandler import getVolFracs
 cf = config.configASAB
@@ -65,7 +66,7 @@ def flushSyringe(pumps:dict, valves:dict, pump:str, reservoir:str, waste:str=con
         # Wait until the pump has finished pumping
         timer.wait_until(pumps[pump].is_pumping, False)
 
-def mix(mixRatio:dict, pumps:dict, valves:dict, assignment:dict=conf["CetoniDevice"]["assignment"], stockSolutionsReservoirs:dict=conf["CetoniDevice"]["stockSolutionsReservoirs"], waste:str=conf["CetoniDevice"]["waste"], gas:str=conf["CetoniDevice"]["gas"], setup:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], flow:float=conf["CetoniDeviceDriver"]["flow"]):
+def mix(mixRatio:dict, pumps:dict, valves:dict, via=[], assignment:dict=conf["CetoniDevice"]["assignment"], stockSolutionsReservoirs:dict=conf["CetoniDevice"]["stockSolutionsReservoirs"], waste:str=conf["CetoniDevice"]["waste"], gas:str=conf["CetoniDevice"]["gas"], setup:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]["setup"], flow:float=conf["CetoniDeviceDriver"]["flow"]):
     ''' This function mixes from reservoirs according to the given mixing ratio. The mixing ratio must be given as volume fractions for the solution in each reservoir.
     mixRatio = {"Reservoi1": 0.2, "Reservoir2": 0.8}'''
 
@@ -76,7 +77,6 @@ def mix(mixRatio:dict, pumps:dict, valves:dict, assignment:dict=conf["CetoniDevi
     # check setup
     setup = graph.getGraph(setup)
 
-    print('MIXINGRATIO', mixRatio)
     ## Convert the mixRatio to volume fractions
     mixRatio, actualMix = getVolFracs(mixingRatio=mixRatio)
 
@@ -87,17 +87,14 @@ def mix(mixRatio:dict, pumps:dict, valves:dict, assignment:dict=conf["CetoniDevi
     flows = {}
     for sol in mixRatio.keys():
         flows[stockSolutionsReservoirs[sol]] = mixRatio[sol]*flow
-    print(flows)
     # Get the pumps, which are related to the reservoirs in flow.keys()
     involvedPumps = [revAssignment[r] for r in flows.keys() if flows[r] != 0.0]
-    print(involvedPumps)
 
     ## Fill each of the involved syringes with the respective fluid
     # Collect the dead volume of each path to the waste in dV
     dV = []
     ## Fill each pump with its respective fluid
     for p in involvedPumps:
-        print(p)
         # Find a path from the syringe to the reservoir
         pathRP = graph.findPath(start_node=assignment[p], end_node=p)
         # Switch valves according to pathR
@@ -105,11 +102,11 @@ def mix(mixRatio:dict, pumps:dict, valves:dict, assignment:dict=conf["CetoniDevi
         # Fill the syringe up to maximum volume
         print("Filling syringe")
         print(assignment[p], p)
-        fillSyringe(pump=pumps[p], volume=pumps[p].get_volume_max(), reservoir=assignment[p], valvesDict=valves)
+        _ = fillSyringe(pump=pumps[p], volume=pumps[p].get_volume_max(), reservoir=assignment[p], valvesDict=valves)
         
     for pu in involvedPumps:
         # Find a path from pump to waste
-        pathPW = graph.findPath(start_node=pu, end_node=waste)
+        pathPW = graph.findPath(start_node=pu, end_node=waste, via=via)
         # Append the dead volume of pathPW to dV
         dV.append(graph.getTotalQuantity(nodelist=pathPW, quantity="dead_volume"))
         # Switch the valves according to pathPW
@@ -120,10 +117,11 @@ def mix(mixRatio:dict, pumps:dict, valves:dict, assignment:dict=conf["CetoniDevi
     ## Wait until the dead volume of the path from the pump to the waste with the largest dead volume is pumped two times
     # Get the maximum dead volume
     dV_max = max(dV)
-    # Wait until dV_max is pumped two times with flow
-    timer2 = qmixbus.PollingTimer(period_ms = (2.*dV_max/flow)*1000.)
+    print('dV_max', dV_max)
+    # Wait until dV_max is pumped 1.2 times with flow
+    timer2 = qmixbus.PollingTimer(period_ms = (1.2*dV_max/flow)*1000.)
     timer2.wait_until(timer2.is_expired, True)
-    return mixRatio, actualMix#, deviation
+    return mixRatio, actualMix
 
 
 def provideSample(measurementtype:str, sample_node:str, pumps:dict, valves:dict, waste:str=conf["CetoniDevice"]["waste"]):
@@ -146,18 +144,22 @@ def provideSample(measurementtype:str, sample_node:str, pumps:dict, valves:dict,
         switchValves(nodelist=pathTotal, valvesDict=valves)
     else:
         print("ERROR: The total path is not valid.")
-    ## Wait until the volume required for the measurement is pumped 1.5 times or the first pump stops pumping and stop the flow
-    # Initialize a timer
-    timer = qmixbus.PollingTimer(period_ms = 1000. *((graph.getTotalQuantity(nodelist=pathSIN, quantity="dead_volume") + conf["CetoniDevice"]["measureVolumes"][measurementtype])/conf["CetoniDeviceDriver"]["flow"]))
-    print("volume to be pumped: ", graph.getTotalQuantity(nodelist=pathSIN, quantity="dead_volume") + conf["CetoniDevice"]["measureVolumes"][measurementtype])
-    print(f"time to be waited: {timer.get_msecs_to_expiration()/1000.} s, {timer.get_msecs_to_expiration()/60000.} min")
     # Get the currently pumping pumps
     pumpingPs = CetoniDevice_driver.cetoni.pumpingPumps(pumpsDict = pumps)
+    ## Switch the valves from the pumps, which are pumping, to the sample_node to avoid the sample to be pumped to the waste directly
+    for p in pumpingPs:
+        # find a path from the pump to the sample_node
+        pathPN = graph.findPath(start_node=p, end_node=sample_node)
+        # switch the valves for this pump so that it pumps towards the sample_node
+        switchValves(nodelist=pathPN, valvesDict=valves)
+    ## Wait until the volume required for the measurement is pumped 1.5 times or the first pump stops pumping and stop the flow
+    # Initialize a timer
+    timer = qmixbus.PollingTimer(period_ms = 1.5 * 1000. *((graph.getTotalQuantity(nodelist=pathSIN, quantity="dead_volume") + conf["CetoniDevice"]["measureVolumes"][measurementtype])/conf["CetoniDeviceDriver"]["flow"]))
+    print("volume to be pumped: ", graph.getTotalQuantity(nodelist=pathSIN, quantity="dead_volume") + conf["CetoniDevice"]["measureVolumes"][measurementtype])
+    print(f"time to be waited: {timer.get_msecs_to_expiration()/1000.} s, {timer.get_msecs_to_expiration()/60000.} min")
     # Wait and check the two conditions
     while (not timer.is_expired()) and (pumpingPs == CetoniDevice_driver.cetoni.pumpingPumps(pumpsDict=pumps)):
         time.sleep(0.1)
-    # # Wait
-    # timer.wait_until(timer.is_expired, True)
     # Stop all pumps
     CetoniDevice_driver.pumpObj.stop_all_pumps()
     ## Wait a while for the liquid to get stable
@@ -218,7 +220,7 @@ def clean(pumpsDict:dict, setup:Union[str,nx.DiGraph]=conf["CetoniDeviceDriver"]
     # TODO: Test this function
 
     # Message the user to ensure all open ends are in a container
-    input('Please ensure, that all open ends are positioned inside a container.')
+    input('Please ensure, that all open ends are positioned inside a waste container.')
 
     # ensure that setup is a graph
     setup = graph.getGraph(setup)
@@ -395,7 +397,7 @@ def switchValves(nodelist:list, valvesDict:dict, settings:dict={}, valvePosition
             # Print how the valves are switched
             print(f"{valve}: {valvesDict[valve].actual_valve_position()}")
 
-def fillSyringe(pump:pumpObj, volume:float, valvesDict:dict, reservoir:str, waste:str=conf["CetoniDevice"]["waste"], flow:float=conf["CetoniDeviceDriver"]["flow"], setup=conf["CetoniDeviceDriver"]["setup"], valvePositionDict:str=conf["CetoniDeviceDriver"]["valvePositionDict"], simulateBalance:bool=conf["CetoniDeviceDriver"]["simulateBalance"]):
+def fillSyringe(pump:pumpObj, volume:float,valvesDict:dict, reservoir:str, tolerance:float=3.,  waste:str=conf["CetoniDevice"]["waste"], flow:float=conf["CetoniDeviceDriver"]["flow"], setup=conf["CetoniDeviceDriver"]["setup"], valvePositionDict:str=conf["CetoniDeviceDriver"]["valvePositionDict"], simulateBalance:bool=conf["CetoniDeviceDriver"]["simulateBalance"]):
     ''' This function ensures that the syringe does not contain gas, but only liquid. '''
         
     ## Check the input types
@@ -407,13 +409,12 @@ def fillSyringe(pump:pumpObj, volume:float, valvesDict:dict, reservoir:str, wast
     # check setup
     setup = graph.getGraph(setup)
         
-    print(flow)
     # Initialise a balance object
     bal = balance_driver.balance()
     # Save the current valve positions
     origValvePos = CetoniDevice_driver.cetoni.getValvePositions(valvesDict=valvesDict, valvePositionDict=valvePositionDict)
     # Initialise the timer
-    duration = (volume/flow)*1200
+    duration = (volume/flow) * 1000 * 1.2
     timer = qmixbus.PollingTimer(period_ms=duration)
     # Find a path from the pump to the waste
     pathPW = graph.findPath(start_node=pump.name, end_node=waste, valvePositionDict=valvePositionDict, graph=setup)
@@ -430,68 +431,68 @@ def fillSyringe(pump:pumpObj, volume:float, valvesDict:dict, reservoir:str, wast
         # If the syringe is not large enough, use the full volume of the syringe
         vol = pump.get_volume_max()
         print("Volume max", vol)
-    # TODO: enter here to add a while loop for the final volume < vol-tolerance
     # Find a path from the reservoir to the pump
     pathRP = graph.findPath(start_node=reservoir, end_node=pump.name, valvePositionDict=valvePositionDict, graph=setup)
-    # Switch the valves according to pathRP
-    switchValves(nodelist=pathRP, settings={}, valvesDict=valvesDict, valvePositionDict=valvePositionDict)
-    # Aspirate vol into the syringe
-    pump.set_fill_level(level=vol, flow=flow)
-    # Wait until the pump has finished pumping and wait some additional time to let the liquid flow
-    print("Waiting")
-    timer.restart()
-    timer.wait_until(fun=pump.is_pumping, expected_result=False)
-    timer2 = qmixbus.PollingTimer(period_ms=20000)
-    timer2.wait_until(fun=timer2.is_expired, expected_result=True)
-    # Switch the valves according to pathPW
-    switchValves(nodelist=pathPW, settings={}, valvesDict=valvesDict, valvePositionDict=valvePositionDict)
-    # Get the current volume in the syringe of the pump
-    currentVol = pump.get_fill_level()
-    print(currentVol)
-    print(2.0*graph.getTotalQuantity(nodelist=pathPW, quantity="dead_volume"))
-    # Dispense two times the dead volume of the path to the waste
-    new_level = currentVol - 2.0*graph.getTotalQuantity(nodelist=pathPW, quantity="dead_volume")
-    print(new_level)
-    pump.set_fill_level(level=new_level, flow=flow)
-    # Wait until the pump has finished pumping
-    print("Waiting2")
-    timer.restart()
-    print("starting timer")
-    timer.wait_until(fun=pump.is_pumping, expected_result=False)
-    print("done waiting")
-    print(balance_action.readBalance(bal))
-    # Initialise the balance readings list with the current reading of the balance
-    readingsBalance = [balance_action.readBalance(bal)]
-    print(readingsBalance)
-    filling = pump.get_fill_level()
-    # Set the limit for dispensing to 0.1*the volume contained in the syringe
-    limit_level = filling*0.1
-    # Start dispensing
-    pump.set_fill_level(level=limit_level, flow=flow)
-    # While the pump is pumping
-    while pump.is_pumping():
-        while len(readingsBalance) < 30:
+    # initialize filling_full
+    filling_full = 0.0
+    # TODO: enter here to add a while loop for the final volume < vol-tolerance
+    # As long as the syringe is not sufficiently filled, repeat the process of filling and dispensing liquid.
+    while filling_full < volume-tolerance:
+        # Switch the valves according to pathRP
+        switchValves(nodelist=pathRP, settings={}, valvesDict=valvesDict, valvePositionDict=valvePositionDict)
+        # Aspirate vol into the syringe
+        pump.set_fill_level(level=vol, flow=flow)
+        # Wait until the pump has finished pumping and wait some additional time to let the liquid flow
+        print("Waiting")
+        timer.restart()
+        timer.wait_until(fun=pump.is_pumping, expected_result=False)
+        timer2 = qmixbus.PollingTimer(period_ms=200000)
+        timer2.wait_until(fun=timer2.is_expired, expected_result=True)
+        # Switch the valves according to pathPW
+        switchValves(nodelist=pathPW, settings={}, valvesDict=valvesDict, valvePositionDict=valvePositionDict)
+        # Get the current volume in the syringe of the pump
+        currentVol = pump.get_fill_level()
+        # Dispense two times the dead volume of the path to the waste
+        new_level = currentVol - 2.0*graph.getTotalQuantity(nodelist=pathPW, quantity="dead_volume")
+        pump.set_fill_level(level=new_level, flow=flow)
+        # Wait until the pump has finished pumping
+        print("Waiting2")
+        timer.restart()
+        print("starting timer")
+        timer.wait_until(fun=pump.is_pumping, expected_result=False)
+        print("done waiting")
+        # Initialise the balance readings list with the current reading of the balance
+        readingsBalance = [balance_action.readBalance(bal)]
+        filling = pump.get_fill_level()
+        # Set the limit for dispensing to 0.1*the volume contained in the syringe
+        limit_level = filling*0.1
+        # Start dispensing
+        pump.set_fill_level(level=limit_level, flow=flow)
+        # While the pump is pumping
+        while pump.is_pumping():
+            while len(readingsBalance) < 50:
+                # Read the balance
+                currentMass = balance_action.readBalance(bal)
+                # Add the new value to the list of readings
+                readingsBalance.append(currentMass)
             # Read the balance
             currentMass = balance_action.readBalance(bal)
             # Add the new value to the list of readings
             readingsBalance.append(currentMass)
-        # Read the balance
-        currentMass = balance_action.readBalance(bal)
-        # Add the new value to the list of readings
-        readingsBalance.append(currentMass)
-        # Determine the gradient in a linear fit
-        gradient = np.polyfit(x=range(30),y=readingsBalance[-30::],deg=1)[0]  #https://numpy.org/doc/stable/reference/generated/numpy.polyfit.html
-        print(gradient)
-        # Check, if the gradient exceeds a threshold
-        if gradient>0.003:
-            # Stop pumping after certain increase is reached -> TODO: Add something to make sure that the dead volume is still pumped through the tube!!!
-            pump.stop_pumping()
-    # Check, if the pump stopped due to the lower volume limit
-    if pump.get_fill_level() <= limit_level:
-        # Print a message, if the lower limit was hit
-        print("The syringe seems to be empty. Please check the cause for that.")
-    # Get the current fill level of the pump
-    filling_full = pump.get_fill_level()
+            # Determine the gradient in a linear fit
+            gradient = np.polyfit(x=range(30),y=readingsBalance[-30::],deg=1)[0]  #https://numpy.org/doc/stable/reference/generated/numpy.polyfit.html
+            print(gradient)
+            # Check, if the gradient exceeds a threshold
+            if gradient>0.003:
+                # Stop pumping after certain increase is reached -> TODO: Add something to make sure that the dead volume is still pumped through the tube!!!
+                pump.stop_pumping()
+        # Check, if the pump stopped due to the lower volume limit
+        if pump.get_fill_level() <= limit_level:
+            # Print a message, if the lower limit was hit
+            print("The syringe seems to be empty. Please check the cause for that.")
+        # Get the current fill level of the pump
+        filling_full = pump.get_fill_level()
+
     # Switch the valves back to the initial positions
     switchValves(nodelist=[], settings=origValvePos, valvesDict=valvesDict, valvePositionDict=valvePositionDict)
     # Return the fill level of the pump
