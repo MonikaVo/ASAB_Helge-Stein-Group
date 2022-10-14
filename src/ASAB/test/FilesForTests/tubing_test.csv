@@ -2,9 +2,9 @@ start;edge;end
 A0.0;0215-NN-1;A0.1
 B0.0;0216-NN-2;B0.1
 C0.0;0213-NN-3;C0.1
-Av.1;0289-NN-3;M1.6
-Bv.1;0289-NN-1;M1.5
-Cv.1;0290-NN-4;M1.4
+Av.1;0289-NN-3;M1.1
+Bv.1;0289-NN-1;M1.2
+Cv.1;0290-NN-4;M1.3
 Av.0;0500-NC-3;V1.0
 Bv.0;0490-NC-6;V2.0
 Cv.0;0500-NC-5;V3.0
@@ -23,8 +23,9 @@ V3.2;0489-CC-7;Solvent3
 M1.0;0052-YY-1;ArdV_0_1.0
 ArdV_0_1_0.0;0404-NT;V4.0
 pressurizedGas;1000-YY-1;ArdV_0_1.1
+V4.9;2622-NT-2;nmrIN
+V5.9;5264-NT-1;nmrOUT
 V4.8;2602-NT-1;densiViscoIN
-V5.8;3439-NT-2;densioViscoOUT
-V5.9;0488-CC-3;waste_2
+V5.8;3439-NT-2;densiViscoOUT
+V5.0;0488-CC-3;waste_1
 V5.10;0797-CC-1;waste_1
-Z0.0;0253-DD-s;sdfkjsd

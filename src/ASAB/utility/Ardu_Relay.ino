@@ -1,5 +1,6 @@
 //define variables sent from python
 String inByte;
+String currentState;
 
 // Give the motor control pins names:
 int relay1 = 4;
@@ -20,57 +21,82 @@ void loop() {
   // put your main code here, to run repeatedly:
   if (Serial.available()>0){
     inByte = Serial.readStringUntil('\n');
-    if (inByte == "1_on"){
+    if (inByte == "1_1"){
       digitalWrite(relay1, HIGH);
-      Serial.write("Relay_1 on");
+      currentState = digitalRead(relay1);
+      Serial.print(currentState);
     }
-    else if (inByte == "1_off"){
+    else if (inByte == "1_0"){
       digitalWrite(relay1, LOW);
-      Serial.write("Relay_1 off");
+      currentState = digitalRead(relay1);
+      Serial.print(currentState);
     }
     else if (inByte == "1_pulse"){
       digitalWrite(relay1, HIGH);
       delay(250);
       digitalWrite(relay1, LOW);
     }
-    else if (inByte == "2_on"){
+    else if (inByte == "2_1"){
       digitalWrite(relay2, HIGH);
-      Serial.write("Relay_2 on");
+      currentState = digitalRead(relay2);
+      Serial.print(currentState);
     }
-    else if (inByte == "2_off"){
+    else if (inByte == "2_0"){
       digitalWrite(relay2, LOW);
-      Serial.write("Relay_2 off");
+      currentState = digitalRead(relay2);
+      Serial.print(currentState);
     }
     else if (inByte == "2_pulse"){
       digitalWrite(relay2, HIGH);
       delay(250);
       digitalWrite(relay2, LOW);
     }
-    else if (inByte == "3_on"){
+    else if (inByte == "3_1"){
       digitalWrite(relay3, HIGH);
-      Serial.write("Relay_3 on");
+      currentState = digitalRead(relay3);
+      Serial.print(currentState);
     }
-    else if (inByte == "3_off"){
+    else if (inByte == "3_0"){
       digitalWrite(relay3, LOW);
-      Serial.write("Relay_3 off");
+      currentState = digitalRead(relay3);
+      Serial.print(currentState);
     }
     else if (inByte == "3_pulse"){
       digitalWrite(relay3, HIGH);
       delay(250);
       digitalWrite(relay3, LOW);
     }
-    else if (inByte == "4_on"){
+    else if (inByte == "4_1"){
       digitalWrite(relay4, HIGH);
-      Serial.write("Relay_4 on");
+      currentState = digitalRead(relay4);
+      Serial.print(currentState);
     }
-    else if (inByte == "4_off"){
+    else if (inByte == "4_0"){
       digitalWrite(relay4, LOW);
-      Serial.write("Relay_4 off");
+      currentState = digitalRead(relay4);
+      Serial.print(currentState);
     }
     else if (inByte == "4_pulse"){
       digitalWrite(relay4, HIGH);
       delay(250);
       digitalWrite(relay4, LOW);
+    }
+    // Read the state of a pin and send it back
+    else if (inByte == "1_read"){
+      currentState = digitalRead(relay1);
+      Serial.print(currentState);
+    }
+    else if (inByte == "2_read"){
+      currentState = digitalRead(relay2);
+      Serial.print(currentState);
+    }
+    else if (inByte == "3_read"){
+      currentState = digitalRead(relay3);
+      Serial.print(currentState);
+    }
+    else if (inByte == "4_read"){
+      currentState = digitalRead(relay4);
+      Serial.print(currentState);
     }
     else{
       Serial.write("Invalid input");

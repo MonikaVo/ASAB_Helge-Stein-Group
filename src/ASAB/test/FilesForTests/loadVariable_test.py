@@ -1,0 +1,1 @@
+myVar = {'this': 1, 'is': 'my', 3: 'test', 'for': {'variable': 'which', 1: 'is', 5: 'great'}}

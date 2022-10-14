@@ -1,22 +1,124 @@
 ''' General implementation of functions, which are needed by different components of the software. '''
+## Get the configuration
+try:
+    # if there is a main file, get conf from there
+    from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
+except ImportError as ie:
+    # if the import fails, check, if it is a test, which means, that a file in a pytest folder will be main and thus it will be in the path returned in the error message of the ImportError.
+    if ('pytest' in str(ie)):
+        # the software will produce a warning, which reports the switch to the testing configuration. This warning is always shown.
+        import warnings
+        warnings.filterwarnings('always')
+        warnings.warn('Configuration from main not available, but this looks like a test. Loading test configuration instead.', category=ImportWarning)
+        # the filtering funcitons are set to default again
+        warnings.filterwarnings('default')
+        # the test configuration is imported
+        from ASAB.test.FilesForTests import config_test
+        conf = config_test.config
+    # if "pytest" is not in the error message, it is assumed, that the call did not originate from a test instance and it therefore raises the ImportError.
+    else:
+        raise ie
 
-def saveToFile(savePath:str, data:str):
-    ''' This function saves an object passed as data to a pickle file in the path given in savePath. The file must be .txt. '''
-    with open(savePath, 'w', encoding='utf-8') as out_file:
+from ASAB.configuration import config
+cf = config.configASAB
+
+# Other imports
+from typing import Any, Union, get_args, get_origin, get_type_hints
+from inspect import getfullargspec
+from importlib import import_module
+import sys
+
+
+def saveToFile(folder:str, filename:str, extension:str, data:str) -> None:
+    ''' This function saves an object passed as data to a .txt file in the path given in savePath. The savePath must include
+    the filename and the extension .txt
+    
+    Inputs:
+    folder: a string specifying the path to the folder, to which the data shall be saved
+    filename: a string specifying the filename of the output file
+    data: a string representing the data to be saved in the .txt file
+    
+    Outputs:
+    This function has no outputs. '''
+
+    # Open a file corresponding to the path specified in savePath and write the data to its content. If the file does not 
+    # already exist, it will be created. For safety, the data is cast to a string type again
+    with open(f'{folder}\\{filename}.{extension}', 'w', encoding='utf-8') as out_file:
        out_file.write(str(data)) # https://stackoverflow.com/questions/20101021/how-to-close-the-file-after-pickle-load-in-python
 
-def loadTxtFile(loadPath:str):
-    ''' This function loads a .txt file and returns the evaluation of the content. '''
+def loadVariable(loadPath:str, variable:str) -> Any:
+    ''' This function imports a variable from a .py file.
+    
+    Inputs:
+    loadPath: a string specifying the path to the file to be loaded. This path must contain the filename and the
+              extension .py.
+    variable: a string specifying the name of the variable as it is given in the .py file to load
+
+    
+    Outputs:
+    loadedVariable: a variable loaded from the file '''
+
+    # get the folder and the filename
+    folder = '\\'.join(loadPath.split('\\')[:-1])
+    filename = loadPath.split('\\')[-1].split('.')[0]
+
+    # Add the relevant folder to the PYTHON PATH
+    sys.path.append(folder)
+
+    # import the file as a module
+    loadModule = import_module(name=filename, package=folder)
+
+    # get the variable from the loaded file loadModule and return it
+    loadedVariable = getattr(loadModule, variable)  # https://stackoverflow.com/questions/68754829/from-module-import-variable-with-importlib
+    return loadedVariable
+
+
+def loadTxtFile(loadPath:str) -> Any:
+    ''' This function loads a .txt file and returns the evaluation of the content.
+    
+    Inputs:
+    loadPath: a string specifying the path to the file to be loaded. This path must contain the filename and the
+    extension .txt.
+    
+    Outputs:
+    dataEval: the evaluation of the string contained in the .txt file '''
+
     # Open and read the file containing the data
     with open(loadPath, "r", encoding='utf-8') as file:
         rawString = file.read()
-    # Evaluate the rawString
+
+    # Evaluate the rawString and return the result
     dataEval = eval(rawString)
     return dataEval
 
-# TODO:Test this function
-def typeCheck(inputObjects:dict, inputTypes:dict):
-    ''' This function checks the type for several input parameters passed as a dict. It passes, if the types match and raises a ValueError, if one of the types is incorrect. '''
-    for inputParam in inputTypes.keys():
-        if (not isinstance(inputObjects[inputParam], inputTypes[inputParam])):
-            raise ValueError(f'Incorrect type of {inputParam} {type(inputParam)} instead of {inputTypes[inputParam]}.')    # https://stackoverflow.com/questions/20844347/how-would-i-make-a-custom-error-message-in-python
+
+def typeCheck(func, locals:dict) -> bool:
+    ''' This function checks the type for several input parameters passed as a dict. It passes, if the types match and raises
+    a TypeError, if one of the types is incorrect.
+    
+    Inputs:
+    inputObjects: a dictionary with the string of the name of the input variable as a key and the object of the input variable as the
+                  corresponding value. Such a dictionary can be generated by the locals() method.
+    inputTypes: a dictionary with the string of the name of the input variable as a key and the type of the input variable as the
+                corresponding value. Such a dictionary can be generated by the typing.get_type_hints() method, if type hints
+                are used in the definition of the function. '''
+
+    ## get the inputObjects and inputTypes
+    arguments = getfullargspec(func).args
+    inputObjects = dict([(arguments[i],locals[arguments[i]]) for i in range(len(arguments))])
+    inputTypes = get_type_hints(func)
+
+    # go through all the keys in the inputObjects
+    for inputVal in inputObjects.keys():
+        if inputVal != 'self':
+            inType = inputTypes[inputVal]
+            # check, if for this input several types are allowed
+            if (get_origin(inType) == Union):   # https://stackoverflow.com/questions/45957615/check-a-variable-against-union-type-at-runtime-in-python-3-6
+                # if the type is set as a Union (multiple types are allowed), generate a tuple of the allowed types
+                inType = get_args(inType)
+            # check, if the input value does not corresponds to its type as specified in inputTypes
+            if (not isinstance(inputObjects[inputVal], inType)):
+                # if the type is not according to the specified type in inputTypes, raise a ValueError
+                raise TypeError(f'Incorrect type of {inputVal} {type(inputObjects[inputVal])} instead of {inputTypes[inputVal]}.')    # https://stackoverflow.com/questions/20844347/how-would-i-make-a-custom-error-message-in-python
+        # return True. The return command can only be reached, if no error occurred
+        return True

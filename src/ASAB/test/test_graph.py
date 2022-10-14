@@ -4,38 +4,225 @@ conf = config_test.config
 import networkx as nx
 import pandas as pd
 import numpy as np
+from os import remove
+from pathlib import Path
+from pytest import raises
+from matplotlib.pyplot import savefig
+from matplotlib.testing import compare
+
 from ASAB.utility import graph
-from ASAB.utility.helpers import loadTxtFile
+from ASAB.utility.helpers import loadVariable
 from ASAB.driver.CetoniDevice_driver import loadValvePositionDict
+from ASAB.driver.CetoniDevice_driver import cetoni
 
 
 print("\n Test of functions in graph.py. \n")
 
-# TODO: Fix this test
-def test_findClosest(testgraph=loadTxtFile(conf["CetoniDeviceDriver"]["setup"])):
-    node = conf["graph"]["testInput"]["findClosest"]["node"]
-    candidates = conf["graph"]["testInput"]["findClosest"]["candidates"]
-    closest_target = conf["graph"]["testOutput"]["findClosest"]["closest_target"]
+def test_generateGraph():
     
-    closest_graph, pathToClosest = graph.findClosest(graph=testgraph, node=node, candidates=candidates, weight="dead_volume", direction="out")
-    assert closest_target==closest_graph
+    path_nodes=conf["graph"]["pathNodes"]
+    path_edges=conf["graph"]["pathEdges"]
+    path_tubing=conf["graph"]["pathTubing"]
+    save_path=conf["graph"]["savePath_graph"]
+
+    # Delete the graph file and the positions file, if they are already in the target directory to avoid them being checked instead of the newly created ones
+    if Path(conf['graph']['savePath_graph']).is_file():
+        remove(conf['graph']['savePath_graph'])
+    if Path(conf['test_graph']['positions']).is_file():
+        remove(conf['test_graph']['positions'])
+
+    ### Check the graph
+
+    # Get the target graph
+    graph_target = loadVariable(loadPath=conf['test_graph']['graph_target'], variable='graph')
+
+    # Get the test object
+    graph_result, positions_result = graph.generateGraph(path_nodes=path_nodes, path_edges=path_edges, path_tubing=path_tubing, show=False, save=True, save_path=save_path)
+
+    # Make sure, that the graph file was created as expected
+    assert Path(conf['graph']['savePath_graph']).is_file(), f"The graph file was not created in the expected location {conf['graph']['savePath_graph']}."
+
+    # Ensure, that the graph is of type nx.DiGraph
+    assert type(graph_result) == nx.DiGraph, f"The type of the graph is {type(graph_result)} instead of networkx.DiGraph."
+    
+    # Check each entry in the dict of the graphs
+    for k in graph_target:
+        assert graph_target[k] == nx.to_dict_of_dicts(graph_result)[k], f"The entry {k} is {nx.to_dict_of_dicts(graph_result)[k]} instead of {graph_target[k]}."
+
+    # Check positions.
+    positions_target = pd.read_csv(conf["graph"]["pathNodes"], sep=';')
+    positions_target = positions_target.set_index('node')
+
+    for n in positions_target.index:
+        # Get a tuple from the position in the dataframe
+        position_target = tuple([float(pos) for pos in positions_target.loc[n, 'position_node'].strip('()').split(',')])
+
+        # Check for each node in the nodes file, that the position matches the one in the graph; a space needs to be added after the comma, so that the strings are equal.
+        assert position_target == positions_result[n], f"The node {n} has position {positions_result[n]} instead of {position_target}."
+
+def test_loadGraph():
+    # get the target graph
+    graph_target = nx.from_dict_of_dicts(loadVariable(loadPath=conf['test_graph']['graph_target'], variable='graph'), create_using=nx.DiGraph)
+    positions_target = loadVariable(loadPath=conf['test_graph']['positions'], variable='graph_positions')
+
+    # get the result of the loadGraph function
+    graph_result, positions_result = graph.loadGraph(conf['graph']['savePath_graph'])
+
+    # Ensure, that the graph is of type nx.DiGraph
+    assert type(graph_result) == nx.DiGraph, f"The type of the graph is {type(graph_result)} instead of networkx.DiGraph."
+
+    # Assert, that all nodes are the same
+    for i in range(len(graph_target.nodes)):
+        assert list(graph_target.nodes)[i] == list(graph_result.nodes)[i], f"The node with index {i} is {list(graph_result.nodes)[i]} instead of {list(graph_target.nodes)[i]}."
+
+    # Assert, that all edges are the same
+    for j in range(len(graph_target.edges)):
+        assert list(graph_target.edges)[j] == list(graph_result.edges)[j], f"The edge with index {j} is {list(graph_result.edges)[j]} instead of {list(graph_target.edges)[j]}."
+
+    # Assert, that the loaded positions are correct
+    for k in positions_target.keys():
+        assert positions_target[k] == positions_result[k], f"The position of {k} is {positions_result[k]} instead of {positions_target[k]}."
+
+def test_getGraph():
+    # get the target graph
+    graph_target = nx.from_dict_of_dicts(loadVariable(loadPath=conf['test_graph']['graph_target'], variable='graph'), create_using=nx.DiGraph)
+    positions_target = loadVariable(loadPath=conf['test_graph']['positions'], variable='graph_positions')
+
+    ## Get graph from a graph positions as str
+    graph_graph_result, positions_graph_result = graph.getGraph(graph=graph_target, positions=conf['test_graph']['positions'])
+    # Assert, that a DiGraph object is returned
+    assert type(graph_graph_result) == nx.DiGraph, f"The type of the graph is {type(graph_graph_result)} instead of networkx.DiGraph"
+    # Assert, that all nodes are the same
+    for i in range(len(graph_target.nodes)):
+        assert list(graph_target.nodes)[i] == list(graph_graph_result.nodes)[i], f"The node with index {i} is {list(graph_graph_result.nodes)[i]} instead of {list(graph_target.nodes)[i]}."
+    # Assert, that all edges are the same
+    for j in range(len(graph_target.edges)):
+        assert list(graph_target.edges)[j] == list(graph_graph_result.edges)[j], f"The edge with index {j} is {list(graph_graph_result.edges)[j]} instead of {list(graph_target.edges)[j]}."
+    # Assert the correct positions
+    for k in positions_target.keys():
+        assert positions_target[k] == positions_graph_result[k], f"The position of node {k} is {positions_graph_result[k]} instead of {positions_target[k]}."
+
+    # get the graph from a string
+    graph_str_result, positions_str_result = graph.getGraph(graph=conf['test_graph']['graph_target'], positions=conf['test_graph']['positions'])
+    # Assert, that a DiGraph object is returned
+    assert type(graph_str_result) == nx.DiGraph, f"The type of the graph is {type(graph_str_result)} instead of networkx.DiGraph"
+    # Assert, that all nodes are the same
+    for l in range(len(graph_target.nodes)):
+        assert list(graph_target.nodes)[l] == list(graph_str_result.nodes)[l], f"The node with index {l} is {list(graph_str_result.nodes)[l]} instead of {list(graph_target.nodes)[l]}."
+    # Assert, that all edges are the same
+    for m in range(len(graph_target.edges)):
+        assert list(graph_target.edges)[m] == list(graph_str_result.edges)[m], f"The edge with index {m} is {list(graph_str_result.edges)[m]} instead of {list(graph_target.edges)[m]}."
+    # Assert the correct positions
+    for n in positions_target.keys():
+        assert positions_target[n] == positions_graph_result[n], f"The position of node {n} is {positions_graph_result[n]} instead of {positions_target[n]}."
+
+    # get the graph from a dictionary
+    g = loadVariable(loadPath=conf['test_graph']['graph_target'], variable='graph')
+    graph_dict_result, positions_dict_result = graph.getGraph(graph=g, positions=conf['test_graph']['positions'])
+    # Assert, that a DiGraph object is returned
+    assert type(graph_dict_result) == nx.DiGraph, f"The type of the graph is {type(graph_dict_result)} instead of networkx.DiGraph"
+    # Assert, that all nodes are the same
+    for o in range(len(graph_target.nodes)):
+        assert list(graph_target.nodes)[o] == list(graph_dict_result.nodes)[o], f"The node with index {o} is {list(graph_dict_result.nodes)[o]} instead of {list(graph_target.nodes)[o]}."
+    # Assert, that all edges are the same
+    for p in range(len(graph_target.edges)):
+        assert list(graph_target.edges)[p] == list(graph_dict_result.edges)[p], f"The edge with index {p} is {list(graph_dict_result.edges)[p]} instead of {list(graph_target.edges)[p]}."
+    # Assert the correct positions
+    for q in positions_target.keys():
+        assert positions_target[q] == positions_graph_result[q], f"The position of node {q} is {positions_graph_result[q]} instead of {positions_target[q]}."
+
+    # wrong string graph
+    with raises(ValueError):
+        graph.getGraph(graph="This is not a path.", positions=conf['test_graph']['positions'])
+
+    # wrong type of graph variable
+    with raises(TypeError):
+        graph.getGraph(graph=123, positions=conf['test_graph']['positions'])
+
+    # graph as graph, but None for positions
+    with raises(ValueError):
+        graph.getGraph(graph=g, positions=None)
+
+    # graph as string and None for positions
+    graph_strStr_result, positions_strStr_result = graph.getGraph(graph=conf['test_graph']['graph_target'], positions=None)
+    # Assert, that a DiGraph object is returned
+    assert type(graph_strStr_result) == nx.DiGraph, f"The type of the graph is {type(graph_strStr_result)} instead of networkx.DiGraph"
+    # Assert, that all nodes are the same
+    for r in range(len(graph_target.nodes)):
+        assert list(graph_target.nodes)[r] == list(graph_strStr_result.nodes)[r], f"The node with index {r} is {list(graph_strStr_result.nodes)[r]} instead of {list(graph_target.nodes)[r]}."
+    # Assert, that all edges are the same
+    for s in range(len(graph_target.edges)):
+        assert list(graph_target.edges)[s] == list(graph_strStr_result.edges)[s], f"The edge with index {s} is {list(graph_strStr_result.edges)[s]} instead of {list(graph_target.edges)[s]}."
+    # Assert the correct positions
+    for t in positions_target.keys():
+        assert positions_target[t] == positions_strStr_result[t], f"The position of node {t} is {positions_strStr_result[t]} instead of {positions_target[t]}."
+
+def test_findClosest():
+    # get the graph
+    graph_to_check, positions_to_check = graph.loadGraph(path_to_graphDict=conf['test_graph']['graph_target'])
+
+    # get the inpust for the function from the configuration file
+    node = conf["test_graph"]["findClosest"]["node"]
+    candidates = conf["test_graph"]["findClosest"]["candidates"]
+
+    # get the target node from the configuration file
+    closest_target = conf["test_graph"]["findClosest"]["closest_target"]
+    pathToClosest_target = conf["test_graph"]["findClosest"]["pathToClosest_target"]
+
+    # use the function to get the results
+    closest_result, pathToClosest_result = graph.findClosest(graph=graph_to_check, node=node, candidates=candidates, weight="dead_volume", direction="in")
+ 
+    assert closest_target==closest_result, f'The closest node found in the graph is {closest_result}, but the target is {closest_target}.'
+    assert pathToClosest_target==pathToClosest_result, f'The oath to the closest node found in the graph is {pathToClosest_result}, but the target is {pathToClosest_target}.'
+
+def test_findPathAB():
+    # get the target path
+    pathAB_target = conf["test_graph"]["findClosest"]["pathToClosest_target"]
+
+    # find the path
+    pathAB_result = graph.findPathAB(start_node=conf["test_graph"]["findClosest"]["closest_target"], end_node=conf["test_graph"]["findClosest"]["node"])
+    # check the type of the found path
+    assert type(pathAB_result) == list, f"The type of the obtained path is {type(pathAB_result)} instead of list."
+
+    assert pathAB_target == pathAB_result, f"The found path is {pathAB_result} instead of {pathAB_target}."
 
 def test_findPath():
-    path_target = conf["graph"]["testInput"]["getEdgeDict"]["nodelist"]
-    pathValidity_target = graph.pathIsValid(path=path_target, valvePositionDict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]))
+    ## No additional nodes
 
-    path_result = graph.findPath(start_node=path_target[0], end_node=path_target[-1], valvePositionDict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]), graph=graph.loadGraph(conf["CetoniDeviceDriver"]["setup"]))
-    pathValidity_result = graph.pathIsValid(path=path_result, valvePositionDict=loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"]))
+    # get the target path
+    path_direct_target = conf["test_graph"]["findPath"]["path_direct_target"]
 
-    assert path_target == path_result
-    assert pathValidity_target == True
-    assert pathValidity_result == True
+    # find the path
+    path_direct_result = graph.findPath(start_node=conf["test_graph"]["findPath"]["start_node"], end_node=conf["test_graph"]["findPath"]["end_node"], via=[])
+    # check the type of the found path
+    assert type(path_direct_result) == list, f"The type of the obtained path is {type(path_direct_result)} instead of list."
+    print(path_direct_result)
+    assert path_direct_target == path_direct_result, f"The found path is {path_direct_result} instead of {path_direct_target}."
 
-def test_checkConsistency(path_nodes=conf["graph"]["testInput"]["checkConsistency"]["path_nodes"], path_edges=conf["graph"]["testInput"]["checkConsistency"]["path_edges"], path_tubing_match=conf["graph"]["testInput"]["checkConsistency"]["path_tubing_match"], path_tubing_newEdge=conf["graph"]["testInput"]["checkConsistency"]["path_tubing_newEdge"]):
+    ## With additional nodes
+    # get the target path
+    path_via_target = conf["test_graph"]["findPath"]["path_via_target"]
+
+    # find the path
+    path_via_result = graph.findPath(start_node=conf["test_graph"]["findPath"]["start_node"], end_node=conf["test_graph"]["findPath"]["end_node"], via=conf["test_graph"]["findPath"]["via"])
+    # check the type of the found path
+    assert type(path_via_result) == list, f"The type of the obtained path is {type(path_via_result)} instead of list."
+    print(path_via_result)
+    assert path_via_target == path_via_result, f"The found path is {path_via_result} instead of {path_via_target}."
+
+def test_checkConsistency():
+    # get the paths from the configuration file
+    path_nodes = conf["test_graph"]["checkConsistency"]["path_nodes"]
+    path_edges = conf["test_graph"]["checkConsistency"]["path_edges"]
+    path_tubing_match = conf["test_graph"]["checkConsistency"]["path_tubing_match"]
+    path_tubing_additionalNode = conf["test_graph"]["checkConsistency"]["path_tubing_newNode"]
+    path_tubing_additionalEdge = conf["test_graph"]["checkConsistency"]["path_tubing_newEdge"]
+    path_tubing_additionalEdgeAndNode = conf["test_graph"]["checkConsistency"]["path_tubing_newEdgeAndNode"]
+
     edges = pd.read_csv(path_edges, sep=";")
     nodes = pd.read_csv(path_nodes, sep=";")
     
-    # Matching .csv files
+    ## Matching .csv files
     tubing = pd.read_csv(path_tubing_match, sep=";")
     tubing_nodes = pd.concat([tubing["start"], tubing["end"]], axis=0)
     nods = list(tubing_nodes)
@@ -43,183 +230,278 @@ def test_checkConsistency(path_nodes=conf["graph"]["testInput"]["checkConsistenc
     tube_edge_ref = all([edge in list(edges["edge"]) for edge in list(tubing["edge"])])
     total_ref = tube_edge_ref and tube_node_ref
 
-    total_graph, tube_edge_graph, tube_node_graph = graph.checkConsistency(path_nodes, path_edges, path_tubing_match)
+    total_result, tube_edge_result, tube_node_result = graph.checkConsistency(path_nodes=path_nodes, path_edges=path_edges, path_tubing=path_tubing_match)
 
-    assert tube_edge_ref == tube_edge_graph
-    assert tube_node_ref == tube_node_graph
-    assert total_ref == total_graph
-    results = [tube_edge_ref, tube_edge_graph, tube_node_ref, tube_node_graph, total_ref, total_graph]
+    results = [tube_edge_ref, tube_edge_result, tube_node_ref, tube_node_result, total_ref, total_result]
     for res in results:
         assert type(res) == bool
 
-    # New entry
-    tubing = pd.read_csv(path_tubing_newEdge, sep=";")
-    tubing_nodes = pd.concat([tubing["start"], tubing["end"]], axis=0)
-    nods = list(tubing_nodes)
-    tube_node_ref = all([node in list(nodes["node"]) for node in nods])
-    tube_edge_ref = all([edge in list(edges["edge"]) for edge in list(tubing["edge"])])
-    total_ref = tube_edge_ref and tube_node_ref
+    assert tube_edge_ref == tube_edge_result, f"The consistency of the matching edges is {tube_edge_result} instead of {tube_edge_ref}."
+    assert tube_node_ref == tube_node_result, f"The consistency of the matching nodes is {tube_node_result} instead of {tube_node_ref}."
+    assert total_ref == total_result, f"The total consistency of the matching scenario is {total_result} instead of {total_ref}."
 
-    total_graph, tube_edge_graph, tube_node_graph = graph.checkConsistency(path_nodes, path_edges, path_tubing_newEdge)
+    ## New node
+    tubing2 = pd.read_csv(path_tubing_additionalNode, sep=";")
+    tubing_nodes2 = pd.concat([tubing2["start"], tubing2["end"]], axis=0)
+    nods2 = list(tubing_nodes2)
+    tube_node_ref2 = all([node in list(nodes["node"]) for node in nods2])
+    tube_edge_ref2 = all([edge in list(edges["edge"]) for edge in list(tubing2["edge"])])
+    total_ref2 = tube_edge_ref2 and tube_node_ref2
 
-    assert 2 == len(tube_node_graph)
-    assert total_ref == total_graph
-    assert len(tube_edge_graph) == 1
-    assert list(tube_edge_graph) == ["0253-DD-s"]
+    total_result2, tube_edge_result2, tube_node_result2 = graph.checkConsistency(path_nodes=path_nodes, path_edges=path_edges, path_tubing=path_tubing_additionalNode)
 
-def test_appendEdge(edge_name="0286-NT-1", edgeNodes=pd.read_csv(conf["graph"]["testInput"]["checkConsistency"]["path_tubing_match"], sep=";"), edgeProps=pd.read_csv(conf["graph"]["testInput"]["checkConsistency"]["path_edges"], sep=";")):
+    results = [tube_edge_ref2, tube_node_ref2, total_ref2, total_result2]
+    for res in results:
+        assert type(res) == bool
+
+    for res in [tube_edge_result2, tube_node_result2]:
+        assert type(res) == list
+
+    assert 0 == len(tube_edge_result2), f"The consistency of the additional node edges is {tube_edge_result2} instead of 0."
+    for l in range(len(tube_node_result2)):
+        assert ['ZZ'][l] == tube_node_result2[l], f"The consistency of the  additional node nodes is {tube_node_result2} instead of ['ZZ']."
+    assert total_ref2 == total_result2, f"The total consistency of the  additional node scenario is {total_result2} instead of {total_ref2}."
+
+    ## New edge
+    tubing3 = pd.read_csv(path_tubing_additionalEdge, sep=";")
+    tubing_nodes3 = pd.concat([tubing3["start"], tubing3["end"]], axis=0)
+    nods3 = list(tubing_nodes3)
+    tube_node_ref3 = all([node in list(nodes["node"]) for node in nods3])
+    tube_edge_ref3 = all([edge in list(edges["edge"]) for edge in list(tubing3["edge"])])
+    total_ref3 = tube_edge_ref3 and tube_node_ref3
+
+    total_result3, tube_edge_result3, tube_node_result3 = graph.checkConsistency(path_nodes=path_nodes, path_edges=path_edges, path_tubing=path_tubing_additionalEdge)
+
+    results = [tube_edge_ref3, tube_node_ref3, total_ref3, total_result3]
+
+    for res in results:
+        assert type(res) == bool
+
+    for res in [tube_edge_result3, tube_node_result3]:
+        assert type(res) == list
+
+    for k in range(len(tube_edge_result3)):
+        assert ['1234-CC-6'][k] == tube_edge_result3[k], f"The consistency of the additional edge edges is {tube_edge_result3} instead of ['1234-CC-6']."
+    assert 0 == len(tube_node_result3), f"The consistency of the additional edge nodes is {tube_node_result3} instead of {tube_node_ref3}."
+    assert total_ref3 == total_result3, f"The total consistency of the additional edge scenario is {total_result3} instead of {total_ref3}."
+
+    ## New edge and new node
+    tubing4 = pd.read_csv(path_tubing_additionalEdgeAndNode, sep=";")
+    tubing_nodes4 = pd.concat([tubing4["start"], tubing4["end"]], axis=0)
+    nods4 = list(tubing_nodes4)
+    tube_node_ref4 = all([node in list(nodes["node"]) for node in nods4])
+    tube_edge_ref4 = all([edge in list(edges["edge"]) for edge in list(tubing4["edge"])])
+    total_ref4 = tube_edge_ref4 and tube_node_ref4
+
+    total_result4, tube_edge_result4, tube_node_result4 = graph.checkConsistency(path_nodes=path_nodes, path_edges=path_edges, path_tubing=path_tubing_additionalEdgeAndNode)
+
+    results = [tube_edge_ref4, tube_node_ref4, total_ref4, total_result4]
+    for res in results:
+        assert type(res) == bool
+
+    for res in [tube_edge_result4, tube_node_result4]:
+        assert type(res) == list
+
+    for i in range(len(tube_edge_result4)):
+        assert ['1234-WW-5', '1245-UU-9'][i] == tube_edge_result4[i], f"The consistency of the additional edge and nodes edges is {tube_edge_result4} instead of ['1234-WW-5', '1245-UU-9']."
+    for j in tube_node_result4:
+        assert j in ['ZZ', 'XY', 'UV', 'AA'], f"The node {j} in the additional edge and node scenario is in {tube_node_result4} but not in ['ZZ', 'XY', 'UV', 'AA']."
+    assert total_ref4 == total_result4, f"The total consistency of the additional edge scenario is {total_result4} instead of {total_ref4}."
+
+def test_appendEdge():
+    # get the inputs from the configuration
+    edgeName = conf['test_graph']['appendEdge']['edgeName']
+    edgeNodes = pd.read_csv(conf["test_graph"]["checkConsistency"]["path_tubing_match"], sep=';')
+    edgeProps = pd.read_csv(conf["test_graph"]["checkConsistency"]["path_edges"], sep=";")
+    
     # Directed edge (not adding both directions)
-    target_directed_edgelst = [("Ev1", "V1.5", {"name": "0286-NT-1", "designation": ("Ev1", "V1.5"), "ends": "NT", "length": float(286), "diameter": float(0.3), "dead_volume": float(0.0202), "status": "empty"})]
-    edgelst1 = []
-    graph.appendEdge(edgelst1, edge_name, edgeNodes, edgeProps, reverse=False)
-    assert target_directed_edgelst == edgelst1
+    edgelst_directed_target = [("V1.1", "Reservoir1", {"name": "0488-CC-2", "designation": ("V1.1", "Reservoir1"), "ends": "CC", "length": float(488), "diameter": float(0.3), "dead_volume": float(0.0345), "status": "empty"})]
+    edgelst_directed_result = []
+    graph.appendEdge(edgeLst=edgelst_directed_result, edgeName=edgeName, edgeNodes=edgeNodes, edgeProps=edgeProps, reverse=False)
+    assert edgelst_directed_target == edgelst_directed_result, f"The resulting edge list is {edgelst_directed_result} instead of {edgelst_directed_target}."
+
     # Undirected edge (adding both directions)
-    target_undirected_edgelst = [("Ev1", "V1.5", {"name": "0286-NT-1", "designation": ("Ev1", "V1.5"), "ends": "NT", "length": float(286), "diameter": float(0.3), "dead_volume": float(0.0202), "status": "empty"}), ("V1.5", "Ev1", {"name": "0286-NT-1", "designation": ("V1.5", "Ev1"), "ends": "NT", "length": float(286), "diameter": float(0.3), "dead_volume": float(0.0202), "status": "empty"})]
-    edgelst2 = []
-    graph.appendEdge(edgelst2, edge_name, edgeNodes, edgeProps, reverse=True)
-    assert target_undirected_edgelst == edgelst2
+    edgelst_undirected_target = [("V1.1", "Reservoir1", {"name": "0488-CC-2", "designation": ("V1.1", "Reservoir1"), "ends": "CC", "length": float(488), "diameter": float(0.3), "dead_volume": float(0.0345), "status": "empty"}), ("Reservoir1", "V1.1", {"name": "0488-CC-2", "designation": ("Reservoir1", "V1.1"), "ends": "CC", "length": float(488), "diameter": float(0.3), "dead_volume": float(0.0345), "status": "empty"})]
+    edgelst_undirected_result = []
+    graph.appendEdge(edgelst_undirected_result, edgeName, edgeNodes, edgeProps, reverse=True)
+    assert edgelst_undirected_target == edgelst_undirected_result, f'The edgelist is {edgelst_undirected_result} instead of {edgelst_undirected_target}.'
 
 def test_drawGraph():
-    # Generate test graph.
-    nodes = conf["graph"]["testInput"]["drawGraph"]["nodes"]
-    edges = conf["graph"]["testInput"]["drawGraph"]["edges"]
-    testgraph=nx.DiGraph()
-    testgraph.add_nodes_from(nodes)
-    testgraph.add_edges_from(edges)
+    # Get the folder where to save the images and the filename for the test and target graphs
+    folder = '\\'.join(conf['graph']['savePath_graph'].split('\\')[:-1]+['\\'])
+    filename_test = f"{folder}graph_test.png"
+    filename_target = f"{folder}graph_target.png"
 
-    # Generate test positions.
-    testpositions = conf["graph"]["testInput"]["drawGraph"]["testpositions"]
+    # Delete the graph image files, if they are already in the target directory to avoid them being checked instead of the newly created ones
+    if Path(filename_test).is_file():
+        remove(filename_test)
+    if Path(filename_target).is_file():
+        remove(filename_target)
 
-    plot3 = nx.draw(testgraph, pos=testpositions, with_labels=True, node_color="g", node_shape="^", node_size=600, alpha=0.6)  # node_color, node_shape, node_size and alpha according to https://networkx.org/documentation/stable/reference/generated/networkx.drawing.nx_pylab.draw_networkx.html#networkx.drawing.nx_pylab.draw_networkx
-    plot4 = graph.drawGraph(testgraph, testpositions)
+    # Generate test graph and the respective positions.
+    graph_test, positions_test = graph.loadGraph(path_to_graphDict=conf['test_graph']['graph_target'])
 
-    # TODO: Find a way to compare the plots.
+    plot3 = nx.draw(graph_test, pos=positions_test, with_labels=True)#, node_color="g", node_shape="^", node_size=600, alpha=0.6)  # node_color, node_shape, node_size and alpha according to https://networkx.org/documentation/stable/reference/generated/networkx.drawing.nx_pylab.draw_networkx.html#networkx.drawing.nx_pylab.draw_networkx
+    plot4 = graph.drawGraph(graph=graph_test, positions=positions_test, save=True, wlabels=True)
 
-# def test_generateValvePositionDict(self):
-#     vPd_target = loadFile(conf["CetoniDeviceDriver"]["valvePositionDict"])
+    # Save the images
+    savefig(fname=filename_test)
+    savefig(fname=filename_target)
 
-#     graph.generateValvePositionDict(save_name=conf["graph"]["testInput"]["generateValvePositionDict"]["savePath"])
-#     vPd_result = loadFile(conf["graph"]["testInput"]["generateValvePositionDict"]["savePath"])
-    
-#     self.assertDictEqual(d1=vPd_target, d2=vPd_result, msg="Valve position dictionaries do not match.")
-
-# TODO: Fix this test. Not passed due to nan != nan
-def test_loadGraph():
-    graph_target = graph.loadGraph(conf["CetoniDeviceDriver"]["setup"])
-    vPd_target = loadValvePositionDict(conf["CetoniDeviceDriver"]["valvePositionDict"])
-
-    graph_graph= graph.loadGraph(conf["CetoniDeviceDriver"]["setup"])
-    for k in nx.to_dict_of_dicts(graph_target).keys():
-        assert graph_target[k] == graph_graph[k]
-    # print(nx.to_dict_of_dicts(graph_target)["lambdaIN"], "\n", nx.to_dict_of_dicts(graph_graph)["lambdaIN"])   #TODO: FIX: Why are the dicts not equal, but the lists are?
-    # for key in nx.to_dict_of_dicts(graph_target):
-    #     print(key)
-    #     self.assertDictEqual(nx.to_dict_of_dicts(graph_target)[key], nx.to_dict_of_dicts(graph_graph)[key])
-    #self.assertDictEqual(nx.to_dict_of_lists(graph_target), nx.to_dict_of_lists(graph_graph))
-    #self.assertDictEqual(vPd_target, vPd_graph)
+    # compare the saved graphs
+    x = compare.compare_images(f"{folder}graph_target.png", f"{folder}graph_test.png", tol=0)
+    assert x == None, f'The result of the image comparison is {x} instead of None.'
 
 def test_getValveFromName():
-    valves_target = conf["graph"]["testOutput"]["getValveFromName"]["valves"]
-    valveNames = conf["graph"]["testInput"]["getValveFromName"]["names"]
+    valves_target = conf["test_graph"]["valves"]
+    valveNames = conf["test_graph"]["valveNames"]
 
     valves_result = []
     for name in valveNames:
-        valve = graph.getValveFromName(node_name=name, valvePositionDict=loadValvePositionDict(conf["graph"]["testInput"]["generateValvePositionDict"]["savePath"]))
+        valve = graph.getValveFromName(node_name=name, valvePositionDict=loadValvePositionDict(conf["graph"]["saveNameValvePositionDict"]))
         valves_result.append(valve)
 
-    assert valves_target == valves_result
+    assert valves_target == valves_result, f'The list of valves is {valves_result} instead of {valves_target}.'
 
-def test_getEdgedictFromNodelist(testgraph=graph.loadGraph(conf["CetoniDeviceDriver"]["setup"])):
-    nodelst = conf["graph"]["testInput"]["getEdgeDict"]["nodelist"]
-    edgeDict_target = conf["graph"]["testOutput"]["getEdgeDict"]["edgeDict_target"]
+def test_getEdgedictFromNodelist():
+    # Get the test graph
+    graph_test, positions_test=graph.loadGraph(path_to_graphDict=conf['test_graph']['graph_target'])
+
+    # Get the node list and the target edgeDict
+    nodelst = conf["test_graph"]["nodelist"]
+    edgeDict_target = conf["test_graph"]["edgeDict_target"]
     
-    edgeDict_graph = graph.getEdgedictFromNodelist(graph=testgraph, nodelist=nodelst)
-    print(edgeDict_graph)
-    assert edgeDict_target == edgeDict_graph
-
-# TODO: Fix this test. Not passed due to nan != nan
-def test_generateGraph(path_nodes=conf["graph"]["testInput"]["checkConsistency"]["path_nodes"], path_edges=conf["graph"]["testInput"]["checkConsistency"]["path_edges"], path_tubing=conf["graph"]["testInput"]["checkConsistency"]["path_tubing_match"], save_path=conf["graph"]["testInput"]["generateGraph"]["savePath"]):
-    # Check generation of graph.
-    # Generate test graph.
-    # TODO: fix edges according to new definition in target values.
-    nodes = conf["graph"]["testInput"]["drawGraph"]["nodes"]
-    edges = conf["graph"]["testInput"]["drawGraph"]["edges"]
-    graph_target=nx.DiGraph()
-    graph_target.add_nodes_from(nodes)
-    graph_target.add_edges_from(edges)
-
-    graph_graph = graph.generateGraph(path_nodes=path_nodes, path_edges=path_edges, path_tubing=path_tubing, show=False, save=True, save_path=save_path)
-    for k in nx.to_dict_of_dicts(graph_target):
-        assert nx.to_dict_of_dicts(graph_target)[k] == nx.to_dict_of_dicts(graph_graph)[k]
-    
-    # Check positions.
-    positions_target = conf["graph"]["testInput"]["drawGraph"]["testpositions"]
-
-    # Load the positions file
-    with open(f"{str(save_path[0:-4])}_positions.txt", "r", encoding="utf-8") as file2:
-        rawString = file2.read()
-    # Make the rawString string to a dict
-    positions_graph = eval(rawString)
-
-    assert positions_target == positions_graph
+    edgeDict_result = graph.getEdgedictFromNodelist(graph=graph_test, nodelist=nodelst)
+    print(edgeDict_result)
+    assert edgeDict_target == edgeDict_result, f'The edgeDict is {edgeDict_result} instead of {edgeDict_target}.'
 
 def test_getTotalQuantity():
-    nodelst = conf["graph"]["testInput"]["getEdgeDict"]["nodelist"]
-    dead_volume_total_target = 0.1807
-    dead_volume_total_graph = graph.getTotalQuantity(nodelist=nodelst, quantity="dead_volume")
-    assert np.isclose(dead_volume_total_target, dead_volume_total_graph, 0.00001)
+    # Get the nodelist, the quantity and its target value
+    nodelst = conf["test_graph"]["nodelist"]
+    quantity = conf["test_graph"]['quantity']
+    totalQuantity_target = conf["test_graph"]['totalQuantity_target']
 
+    totalQuantity_result = graph.getTotalQuantity(nodelist=nodelst, quantity=quantity)
+    assert np.isclose(totalQuantity_result, totalQuantity_target, 0.00001), f"The total {quantity} is {totalQuantity_result} instead of {totalQuantity_target}."
+
+# TODO: fix this test
 def test_getValveSettings():
-    nodelst = conf["graph"]["testInput"]["getEdgeDict"]["nodelist"]
-    vPd = conf["graph"]["testInput"]["getValveSettings"]["vPd"]
 
-    valveSettings_target = {"Av": 1, "V1": 0, "V2": 6, "V3": 0}
-    valveSettings_graph = graph.getValveSettings(nodelst, vPd)
+    ### A valid path including valves
 
-    assert valveSettings_target == valveSettings_graph
+    # Get the nodelist and the valvePositionDict
+    nodelst = conf["test_graph"]["nodelist"]
+    vPd = conf["graph"]["saveNameValvePositionDict"]
+
+    # Get the target valveSettings
+    valveSettings_target = conf["test_graph"]['valveSettings_target']
+    # Get the resulting valveSettings
+    valveSettings_result = graph.getValveSettings(nodelist=nodelst, valvePositionDict=vPd)
+
+    assert valveSettings_target == valveSettings_result, f"The valveSettings are {valveSettings_result} instead of {valveSettings_target}."
+
+    ### A valid path not including valves
+
+    # Get the nodelist
+    nodelst_noValve = conf["test_graph"]["nodelist_noValve"]
+    # Get the target valveSettings
+    valveSettings_noValve_target = {}
+    # Get the resulting valveSettings
+    valveSettings_noValve_result = graph.getValveSettings(nodelist=nodelst_noValve, valvePositionDict=vPd)
+
+    assert valveSettings_noValve_target == valveSettings_noValve_result, f"The valveSettings_noValve are {valveSettings_noValve_result} instead of {valveSettings_noValve_target}."
+
+
+    ### An invalid path
+
+    # Get the nodelist
+    nodelst_wrongPath = conf['test_graph']['nodelist_wrongPath']
+
+    with raises(ValueError):
+        graph.getValveSettings(nodelist=nodelst_wrongPath, valvePositionDict=vPd)
 
 def test_pathIsValid():
-        path_wrong = conf["graph"]["testInput"]["pathIsValid"]["path"]["wrong"]
-        pathValidityWrong_target = False
-        pathValidityWrong_result = graph.pathIsValid(path=path_wrong, valvePositionDict=loadValvePositionDict(conf["graph"]["testInput"]["generateValvePositionDict"]["savePath"]))
+    # Get an invalid path
+    path_wrong = conf["test_graph"]["nodelist_wrongPath"]
+    pathValidityWrong_target = False
+    pathValidityWrong_result = graph.pathIsValid(path=path_wrong, valvePositionDict=loadValvePositionDict(conf["graph"]["saveNameValvePositionDict"]))
 
-        path_correct = conf["graph"]["testInput"]["pathIsValid"]["path"]["correct"]
-        pathValidityCorrect_target = True
-        pathValidityCorrect_result = graph.pathIsValid(path=path_correct, valvePositionDict=loadValvePositionDict(conf["graph"]["testInput"]["generateValvePositionDict"]["savePath"]))
+    assert pathValidityWrong_target == pathValidityWrong_result, f"The path validity is {pathValidityWrong_result} instead of {pathValidityWrong_target}."
 
-        assert pathValidityWrong_target == pathValidityWrong_result
-        assert pathValidityCorrect_target == pathValidityCorrect_result
+    # Get a valid path
+    path_correct = conf["test_graph"]["nodelist"]
+    pathValidityCorrect_target = True
+    pathValidityCorrect_result = graph.pathIsValid(path=path_correct, valvePositionDict=loadValvePositionDict(conf["graph"]["saveNameValvePositionDict"]))
 
-def test_getSystemStatus(path=conf["graph"]["testInput"]["getEdgeDict"]["nodelist"], graph_path=conf["graph"]["testInput"]["getSystemStatus"]):
+    assert pathValidityCorrect_target == pathValidityCorrect_result, f"The path validity is {pathValidityCorrect_result} instead of {pathValidityCorrect_target}."
+
+def test_getSystemStatus():
+
+    # Get a path and a graph
+    path = conf["test_graph"]["nodelist"]
+    G, positions = graph.loadGraph(path_to_graphDict=conf['test_graph']['graph_target'])
+
     # With a given path
-    setup1 = graph.loadGraph(graph_path)
-    edict = graph.getEdgedictFromNodelist(nodelist=path, graph=setup1)
-    status_target1 = {}
+    edict = graph.getEdgedictFromNodelist(nodelist=path, graph=G)
+    status_path_target = {}
     for edge in edict.keys():
-        edict[edge]["status"] = "A0.0"
-        status_target1[edict[edge]["designation"]] = "A0.0"
-    status_result1 = graph.getSystemStatus(path=path, full=False, graph=setup1)
-    
-    assert status_target1 == status_result1
+        edict[edge]["status"] = "updatedStatus"
+        status_path_target[edict[edge]["designation"]] = "updatedStatus"
+    status_path_result = graph.getSystemStatus(path=path, full=False, graph=G)
+    assert status_path_target == status_path_result, f"The status for the path is {status_path_result} instead of {status_path_target}."
 
     # Without a given path
-    setup2 = graph.loadGraph(graph_path)
-    nx.set_edge_attributes(G=setup2, values="new_status", name="status")   # https://networkx.org/documentation/stable/reference/generated/networkx.classes.function.set_edge_attributes.html
-    status_target2 = nx.get_edge_attributes(G=setup2, name="status")
-    status_result2 = graph.getSystemStatus(path=[], full=True, graph=setup2)
+    nx.set_edge_attributes(G=G, values="new_status", name="status")   # https://networkx.org/documentation/stable/reference/generated/networkx.classes.function.set_edge_attributes.html
+    status_full_target = nx.get_edge_attributes(G=G, name="status")
+    status_full_result = graph.getSystemStatus(path=[], full=True, graph=G)
 
-    assert status_target2 == status_result2
+    assert status_full_target == status_full_result, f"The status for the path is {status_full_result} instead of {status_full_target}."
 
+def test_updateSystemStatus():
 
-def test_updateSystemStatus(path=conf["graph"]["testInput"]["getEdgeDict"]["nodelist"], graph_path=conf["graph"]["testInput"]["getSystemStatus"]):
-    setup  = graph.loadGraph(graph_path)
-    edict = graph.getEdgedictFromNodelist(nodelist=path, graph=setup)
+    # Get a path and a graph
+    path = conf["test_graph"]["nodelist"]
+    G2, positions = graph.loadGraph(path_to_graphDict=conf['test_graph']['graph_target'])
+
+    edict = graph.getEdgedictFromNodelist(nodelist=path, graph=G2)
     
-    graph.updateSystemStatus(path=path, graph=setup)
-    status_result = graph.getSystemStatus(path=path, full=False,graph=setup)
+    graph.updateSystemStatus(path=path, graph=G2)
+    status_result = graph.getSystemStatus(path=path, full=False,graph=G2)
     
     status_target = {}
     for edge in edict.keys():
-        status_target[edict[edge]["designation"]] = "A0.0"
+        status_target[edict[edge]["designation"]] = path[0]
 
-    assert status_target == status_result
+    assert status_target == status_result, f"The status is {status_result} instead of {status_target}."
+
+def test_findCandidate():
+    # Get the candidates to work with
+    Ps, Vs, Cs = cetoni.prepareCetoni()
+
+    # Get all the syringes as test objects
+    cands = {}
+    for k in Ps.keys():
+        cands[k] = Ps[k].syringe
+
+    # Apply the function
+    found = graph.findCandidate(candidates=cands, piston_stroke_mm=max, secondary={'minimum_volume_mL': max})
+    
+    assert list(found.keys())[0] == 'B0.0', f"The found key for the syringe is {list(found.keys())[0]} instead of B0.0."
+    assert found['B0.0'].desig == '5_mL', f"The found syringe is {found['B0.0'].desig} instead of B0.0."
+    
+    # Close the bus communication
+    cetoni.quitCetoni()
+
+
+def test_getOpenEnds():
+    # Get the graph
+    graph_path = conf['test_graph']['graph_target']
+
+    # Get the target open ends
+    openEnds_target = conf['test_graph']['openEnds']
+
+    # Get the open edges
+    openEnds_result = graph.getOpenEnds(graph=graph_path)
+
+    for oe in openEnds_target:
+        assert oe in openEnds_result, f"The open ends {openEnds_result} do not contain the entry {oe}."
