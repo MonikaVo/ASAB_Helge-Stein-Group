@@ -54,7 +54,7 @@ def retrieveData(sampleName:str, method:str, methodtype:str, savePath:str):
     data = 0
     while type(data)==int:
         try:
-            data = pd.read_csv(f"Y:\\output\\{sampleName}_{method}_{methodtype}.csv", sep=";")
+            data = pd.read_csv(f"C:\\DensioVisco_data\\AG_Stein\output\\{sampleName}_{method}_{methodtype}.csv", sep=";")
         except FileNotFoundError:
             time.sleep(1)
     extractedData = {"sampleName": sampleName,

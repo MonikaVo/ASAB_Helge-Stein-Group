@@ -7,7 +7,6 @@ except ImportError:
     from ASAB.configuration import default_config
     conf = default_config.config
 
-from platform import node
 from ASAB.configuration import config
 from ASAB.utility.solutionHandler import getVolFracs
 cf = config.configASAB
