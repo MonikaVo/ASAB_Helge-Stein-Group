@@ -1,4 +1,4 @@
 solutionName;reservoir;pump;references;massTotal;massTotal_uncertainty;density;density_uncertainty;LiPF6;LiPF6_uncertainty;EC;EC_uncertainty;EMC;EMC_uncertainty;DMC;DMC_uncertainty
-1M_LiPF6_EC-EMC;Reservoir1;A0.0;"density: https://doi.org/10.1002/batt.202000098";240.203;0.001;1.2;0.01;30.38;0.001;63.086;0.001;146.734;0.001;0;0
-1M_LiPF6_DMC;Reservoir2;B0.0;"density: https://www.sigmaaldrich.com/DE/de/sds/aldrich/746754";236.003;0.001;1.18;0.01;30.38;0.001;0;0.0;0;0;205.62;0.001
-1M_LiPF6_EC-DMC;Reservoir3;C0.0;"density: https://www.sigmaaldrich.com/DE/de/sds/aldrich/746711";260.003;0.001;1.3;0.01;30.38;0.001;114.81;0.001;0;0;114.81;0.001
+1M_LiPF6_EC-EMC;Reservoir1;A0.0;density: https://doi.org/10.1002/batt.202000098;240.203;0.001;1.2;0.01;30.38;0.001;63.086;0.001;146.734;0.001;0.0;0.0
+1M_LiPF6_DMC;Reservoir2;B0.0;density: https://www.sigmaaldrich.com/DE/de/sds/aldrich/746754;236.003;0.001;1.18;0.01;30.38;0.001;0.0;0.0;0.0;0.0;205.62;0.001
+1M_LiPF6_EC-DMC;Reservoir3;C0.0;density: https://www.sigmaaldrich.com/DE/de/sds/aldrich/746711;260.003;0.001;1.3;0.01;30.38;0.001;114.81;0.001;0.0;0.0;114.81;0.001

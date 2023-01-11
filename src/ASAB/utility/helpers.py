@@ -1,23 +1,4 @@
 ''' General implementation of functions, which are needed by different components of the software. '''
-## Get the configuration
-try:
-    # if there is a main file, get conf from there
-    from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
-except ImportError as ie:
-    # if the import fails, check, if it is a test, which means, that a file in a pytest folder will be main and thus it will be in the path returned in the error message of the ImportError.
-    if ('pytest' in str(ie)):
-        # the software will produce a warning, which reports the switch to the testing configuration. This warning is always shown.
-        import warnings
-        warnings.filterwarnings('always')
-        warnings.warn('Configuration from main not available, but this looks like a test. Loading test configuration instead.', category=ImportWarning)
-        # the filtering funcitons are set to default again
-        warnings.filterwarnings('default')
-        # the test configuration is imported
-        from ASAB.test.FilesForTests import config_test
-        conf = config_test.config
-    # if "pytest" is not in the error message, it is assumed, that the call did not originate from a test instance and it therefore raises the ImportError.
-    else:
-        raise ie
 
 from ASAB.configuration import config
 cf = config.configASAB
@@ -25,7 +6,8 @@ cf = config.configASAB
 # Other imports
 from typing import Any, Union, get_args, get_origin, get_type_hints
 from inspect import getfullargspec
-from importlib import import_module
+from importlib import import_module, reload
+from pathlib import Path
 import sys
 
 
@@ -41,10 +23,14 @@ def saveToFile(folder:str, filename:str, extension:str, data:str) -> None:
     Outputs:
     This function has no outputs. '''
 
+    # Check the input types
+    typeCheck(func=saveToFile, locals=locals())
+
     # Open a file corresponding to the path specified in savePath and write the data to its content. If the file does not 
     # already exist, it will be created. For safety, the data is cast to a string type again
-    with open(f'{folder}\\{filename}.{extension}', 'w', encoding='utf-8') as out_file:
-       out_file.write(str(data)) # https://stackoverflow.com/questions/20101021/how-to-close-the-file-after-pickle-load-in-python
+    Path(folder).mkdir(parents=True, exist_ok=True)
+    with open(Path(folder).resolve().joinpath(f"{filename}.{extension}"), 'w', encoding='utf-8') as out_file:
+        out_file.write(str(data)) # https://stackoverflow.com/questions/20101021/how-to-close-the-file-after-pickle-load-in-python
 
 def loadVariable(loadPath:str, variable:str) -> Any:
     ''' This function imports a variable from a .py file.
@@ -58,9 +44,12 @@ def loadVariable(loadPath:str, variable:str) -> Any:
     Outputs:
     loadedVariable: a variable loaded from the file '''
 
+    # Check the input types
+    typeCheck(func=loadVariable, locals=locals())
+
     # get the folder and the filename
-    folder = '\\'.join(loadPath.split('\\')[:-1])
-    filename = loadPath.split('\\')[-1].split('.')[0]
+    folder = str(Path(loadPath).resolve().parent)
+    filename = str(Path(loadPath).stem)
 
     # Add the relevant folder to the PYTHON PATH
     sys.path.append(folder)
@@ -68,6 +57,8 @@ def loadVariable(loadPath:str, variable:str) -> Any:
     # import the file as a module
     loadModule = import_module(name=filename, package=folder)
 
+    # reload the model to re-import the original value and not an altered one
+    loadModule = reload(loadModule)    # https://stackoverflow.com/questions/1254370/reimport-a-module-while-interactive
     # get the variable from the loaded file loadModule and return it
     loadedVariable = getattr(loadModule, variable)  # https://stackoverflow.com/questions/68754829/from-module-import-variable-with-importlib
     return loadedVariable
@@ -82,6 +73,9 @@ def loadTxtFile(loadPath:str) -> Any:
     
     Outputs:
     dataEval: the evaluation of the string contained in the .txt file '''
+
+    # Check the input types
+    typeCheck(func=loadTxtFile, locals=locals())
 
     # Open and read the file containing the data
     with open(loadPath, "r", encoding='utf-8') as file:
@@ -116,9 +110,42 @@ def typeCheck(func, locals:dict) -> bool:
             if (get_origin(inType) == Union):   # https://stackoverflow.com/questions/45957615/check-a-variable-against-union-type-at-runtime-in-python-3-6
                 # if the type is set as a Union (multiple types are allowed), generate a tuple of the allowed types
                 inType = get_args(inType)
+                # inType = tuple((iT for iT in inType if not iT==None.__class__))
+                # print(inType)
             # check, if the input value does not corresponds to its type as specified in inputTypes
             if (not isinstance(inputObjects[inputVal], inType)):
                 # if the type is not according to the specified type in inputTypes, raise a ValueError
                 raise TypeError(f'Incorrect type of {inputVal} {type(inputObjects[inputVal])} instead of {inputTypes[inputVal]}.')    # https://stackoverflow.com/questions/20844347/how-would-i-make-a-custom-error-message-in-python
-        # return True. The return command can only be reached, if no error occurred
-        return True
+    # return True. The return command can only be reached, if no error occurred
+    return True
+
+def importConfig(callingFileName:str):
+    """ This funciton gets the config from main, if this is possible.
+    Alternatively, it get the test configuration, if a test is in progress. If none of
+    these options works, it raises an ImportError.
+    """
+
+    # Check the input types
+    typeCheck(func=importConfig, locals=locals())
+
+    ## Get the configuration
+    try:
+        # if there is a main file, get conf from there
+        from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
+        return conf
+    except ImportError as ie:
+        # if the import fails, check, if it is a test, which means, that a file in a pytest folder will be main and thus it will be in the path returned in the error message of the ImportError.
+        if ('pytest' in str(ie)):
+            # the software will produce a warning, which reports the switch to the testing configuration. This warning is always shown.
+            import warnings
+            warnings.filterwarnings('always')
+            warnings.warn(f'{callingFileName} - Configuration from main not available, but this looks like a test. Loading test configuration instead.', category=ImportWarning)
+            # the filtering funcitons are set to default again
+            warnings.filterwarnings('default')
+            # the test configuration is imported
+            from ASAB.test.FilesForTests import config_test
+            conf = config_test.config
+            return conf
+        # if "pytest" is not in the error message, it is assumed, that the call did not originate from a test instance and it therefore raises the ImportError.
+        else:
+            raise ie

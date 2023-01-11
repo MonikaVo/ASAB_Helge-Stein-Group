@@ -1,22 +1,7 @@
-## Get the configuration
-try:
-    # if there is a main file, get conf from there
-    from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
-except ImportError as ie:
-    # if the import fails, check, if it is a test, which means, that a file in a pytest folder will be main and thus it will be in the path returned in the error message of the ImportError.
-    if ('pytest' in str(ie)):
-        # the software will produce a warning, which reports the switch to the testing configuration. This warning is always shown.
-        import warnings
-        warnings.filterwarnings('always')
-        warnings.warn('Configuration from main not available, but this looks like a test. Loading test configuration instead.', category=ImportWarning)
-        # the filtering funcitons are set to default again
-        warnings.filterwarnings('default')
-        # the test configuration is imported
-        from ASAB.test.FilesForTests import config_test
-        conf = config_test.config
-    # if "pytest" is not in the error message, it is assumed, that the call did not originate from a test instance and it therefore raises the ImportError.
-    else:
-        raise ie
+from ASAB.utility.helpers import importConfig
+from pathlib import Path
+
+conf = importConfig(str(Path(__file__).stem))
 
 ## Imports from ASAB
 from ASAB.utility.helpers import typeCheck
@@ -37,6 +22,7 @@ class balance:
 
         Outputs:
         This function has no outputs. '''
+        
         ## Check the input types
         typeCheck(func=balance.__init__, locals=locals())
 

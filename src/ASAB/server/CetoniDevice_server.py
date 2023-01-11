@@ -1,4 +1,6 @@
 ## THIS FILE SHOULD NOT BE RUN AS MAIN!!!
+
+## TODO: Add a UUID for the mixture
 import uvicorn
 from fastapi import FastAPI, Query
 from typing import List

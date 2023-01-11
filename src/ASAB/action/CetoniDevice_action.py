@@ -1,22 +1,8 @@
-## Get the configuration
-try:
-    # if there is a main file, get conf from there
-    from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
-except ImportError as ie:
-    # if the import fails, check, if it is a test, which means, that a file in a pytest folder will be main and thus it will be in the path returned in the error message of the ImportError.
-    if ('pytest' in str(ie)):
-        # the software will produce a warning, which reports the switch to the testing configuration. This warning is always shown.
-        import warnings
-        warnings.filterwarnings('always')
-        warnings.warn('Configuration from main not available, but this looks like a test. Loading test configuration instead.', category=ImportWarning)
-        # the filtering funcitons are set to default again
-        warnings.filterwarnings('default')
-        # the test configuration is imported
-        from ASAB.test.FilesForTests import config_test
-        conf = config_test.config
-    # if "pytest" is not in the error message, it is assumed, that the call did not originate from a test instance and it therefore raises the ImportError.
-    else:
-        raise ie
+from ASAB.utility.helpers import importConfig
+from pathlib import Path
+import os
+
+conf = importConfig(str(Path(__file__).stem))
 
 from ASAB.configuration import config
 cf = config.configASAB
@@ -38,11 +24,70 @@ from qmixsdk.qmixbus import PollingTimer
 ## Other imports
 from typing import Tuple, Union
 import numpy as np
-from tqdm import tqdm
 import networkx as nx
 from networkx.exception import NodeNotFound, NetworkXNoPath
 import time
+import logging
+import warnings
 
+# create a logger for this module
+logger_CetoniDevice_action = logging.getLogger(f"run_logger.{__name__}")
+
+def prepareRun(graphSave:bool, graphShow:bool, refPos:bool) -> dict:
+    """ This function prepares the Cetoni device and sets all the devices operational,
+    generates a graph, the chemicalsDict and the solutionsDict.
+    
+    Inputs:
+    graphSave: a boolean defining, whether the graph shall be saved
+    graphShow: a boolean defining, whether the graph shall be displayed
+    refPos: a boolean defining, whether the syringes shall close prior to other actions
+    
+    Outputs:
+    restults: a dictionary summarizing the results (pumps, valves, channels, graph, positions,
+    chemicalsDict, solutionsDict)
+    """
+
+    ## Check the input types
+    typeCheck(func=prepareRun, locals=locals())
+
+    # Generate the directory to save the inputs
+    Path(conf["runFolder"]).joinpath("inputs").mkdir(parents=True, exist_ok=True)
+    # Copy the inputs and the script
+    for file in [
+        conf["graph"]["pathNodes"],
+        conf["graph"]["pathEdges"],
+        conf["graph"]["pathTubing"],
+        conf["solutionHandler"]["stockSolutions"],
+        conf["solutionHandler"]["chemicals"],
+        ]:
+        filename = Path(file).name
+        os.popen(f"copy {file} {str(Path(conf['runFolder']).joinpath('inputs', filename))}")
+
+
+    # Prepare the Cetoni device
+    pumps, valves, channels = CetoniDevice_driver.cetoni.prepareCetoni()
+    # Generate the graph
+    G, positions = graph.generateGraph(save=graphSave, show=graphShow)
+    # If the refPos parameter is set to true, got to the start reference position
+    if refPos:
+        # Go to the reference position for the start
+        goToRefPos(pumpsDict=pumps, valvesDict=valves, mode='start')
+    # Generate the chemicalsDict and the solutionsDict
+    chemicalsDict = solutionHandler.generate_chemicalsDict(chemicalsDef=conf['solutionHandler']['chemicals'])
+    solutionsDict = solutionHandler.generate_solutionsDict(solutionsDef=conf['solutionHandler']['stockSolutions'], pumps=pumps, valves=valves)
+    # Collect all the information in a dictionary and return it
+    resultDict = {"pumps": pumps,
+                  "valves": valves,
+                  "channels": channels,
+                  "graph": G,
+                  "positions": positions,
+                  "chemicalsDict": chemicalsDict,
+                  "solutionsDict": solutionsDict}
+    logger_CetoniDevice_action.info(f"{prepareRun.__name__}\n"
+                                    "The setup is done. The following objects were created:\n"
+                                    f"{resultDict}"
+                                   )
+    return resultDict 
 
 def flushSyringe(pumps:dict, valves:dict, pump:str, reservoir:str, waste:str=conf["CetoniDevice"]["waste"], flow:float=conf["CetoniDeviceDriver"]["flow"], repeat:int=3) -> None:
     ''' This function flushes the syringe with the fluid, which will be aspirated in the syringe in order to dilute remainders from previous fluids
@@ -88,7 +133,12 @@ def flushSyringe(pumps:dict, valves:dict, pump:str, reservoir:str, waste:str=con
         # Wait until the pump has finished pumping
         timer.wait_until(pumps[pump].is_pumping, False)
 
-def mix(mixingRatio:dict, fraction:str, pumps:dict, valves:dict, via=[], chemicalsDict:Union[str, dict, None]=conf['solutionHandler']['chemicalsDict'], solutionsDict:Union[str, dict, None]=conf['solutionHandler']['solutionsDict'], endpoint:str=conf["CetoniDevice"]["waste"], setup:Union[str,dict, nx.DiGraph]=conf["graph"]["savePath_graph"], flow:float=conf["CetoniDeviceDriver"]["flow"]) -> Tuple[dict, dict, dict]:
+def mix(mixingRatio:dict, fraction:str, pumps:dict, valves:dict, via:list=[],
+        chemicalsDict:Union[str, dict, None]=conf['solutionHandler']['chemicalsDict'],
+        solutionsDict:Union[str, dict, None]=conf['solutionHandler']['solutionsDict'],
+        endpoint:str=conf["CetoniDevice"]["waste"],
+        setup:Union[str,dict, nx.DiGraph]=conf["graph"]["savePath_graph"],
+        flow:float=conf["CetoniDeviceDriver"]["flow"]) -> Tuple[dict, dict, dict, dict]:
     ''' This function mixes solutions from reservoirs according to the given mixing ratio. The mixing ratio must be given as fractions summing up to unity and the fraction
     parameter denotes, which kind of fraction is given. Currently volume fraction and morar fractions are accepted. For the mixing process, the mixing ratio is transformed
     to a volume fraction, if it is not already a volume fraction.
@@ -104,7 +154,7 @@ def mix(mixingRatio:dict, fraction:str, pumps:dict, valves:dict, via=[], chemica
          a device
     chemicalsDict: a dictionary containing chemical objects as values, or a string specifying the path to a chemicalsDict, or None to newly generate it
     solutionsDict: a dictionary containing solution objects as values, or a string specifying the path to a solutionsDict, or None to newly generate it
-        endpoint: a string giving the name of a node, where the sample shall end up. This could be the waste or another node representing an additional reservoir, which can be reached.
+    Sendpoint: a string giving the name of a node, where the sample shall end up. This could be the waste or another node representing an additional reservoir, which can be reached.
     setup: a string, dictionary or a DiGraph object. If a string is given, this string should represent the path to a file, which contains a dict[dict] describing the graph.
     flow: a float giving the total flow used for the experiment
 
@@ -133,7 +183,16 @@ def mix(mixingRatio:dict, fraction:str, pumps:dict, valves:dict, via=[], chemica
         calcMix_request = {}
         minSquaredError = 0.0
     elif fraction in ['molPerMol']: # TODO: expand this to account for other inputs
-        mixRatio_request, mixRatio_vol, calcMix_request, minSquaredError = solutionHandler.get_volFracs(mixingRatio=mixingRatio, chemicalsDict=chemicalsDict, solutionsDict=solutionsDict, fraction=fraction)
+        mixRatio_request, mixRatio_vol, calcMix_request, minSquaredError = solutionHandler.get_fractions_2(mixingRatio=mixingRatio, chemicalsDict=chemicalsDict, solutionsDict=solutionsDict, input_fraction=fraction, output_fraction="volPerVol")
+
+    logger_CetoniDevice_action.info(f"{mix.__name__} Mixing\n"
+                                f"mixing ratio: {mixingRatio}\n"
+                                f"fraction: {fraction}\n"
+                                f"requested mixing ratio [mol/mol]:\t{mixRatio_request}\n"
+                                f"volumetric mixing ratio [vol/vol]:\t{mixRatio_vol}\n"
+                                f"calculated mixing ratio based on volumetric mixing ratio [mol/mol]:\t{calcMix_request}\n"
+                                f"minimum squared error between the two:\n {minSquaredError}\n")
+
 
     ## Determine the flows required to get the mixture
     # Initialize a dict of flows
@@ -149,6 +208,7 @@ def mix(mixingRatio:dict, fraction:str, pumps:dict, valves:dict, via=[], chemica
         spumpName = solution.pump
         spump = pumps[spumpName]
         sreservoir = solution.reservoir
+        print("\n Mixratio_vol:", mixRatio_vol, "\n Flow:", flow)
         if mixRatio_vol[sol]*flow > 0.0:
             # Add the flow to the flows dictionary using the related reservoir as key
             flows[sol] = mixRatio_vol[sol]*flow
@@ -160,7 +220,7 @@ def mix(mixingRatio:dict, fraction:str, pumps:dict, valves:dict, via=[], chemica
             elif not (flows[sol] < spump.syringe.maximum_flow_mL_per_sec):
                 flowsOK[False][sol] = 'too high'
             else:
-                raise ValueError(f"Something seems to be wrong with the flow for stock soltuion {sol}, which is {mixRatio_vol[sol]*flow} with the syringe lower limit {spump.minimum_flow_mL_per_sec} and higher limit {maximum_flow_mL_per_sec}.")
+                raise ValueError(f"Something seems to be wrong with the flow for stock soltuion {sol}, which is {mixRatio_vol[sol]*flow} with the syringe lower limit {spump.syringe.minimum_flow_mL_per_sec} and higher limit {spump.syringe.maximum_flow_mL_per_sec}.")
             ## Fill the pump with its respective fluid
             # Find a path from the reservoir to the pump
             pathRP = graph.findPath(start_node=sreservoir, end_node=spumpName)
@@ -170,10 +230,11 @@ def mix(mixingRatio:dict, fraction:str, pumps:dict, valves:dict, via=[], chemica
             print("Filling syringe")
             print('solution', sol, 'flow', flows[sol])
             _ = fillSyringe(pump=spump, volume=spump.get_volume_max(), reservoir=sreservoir, valvesDict=valves)
+            logger_CetoniDevice_action.info(f"{mix.__name__}\nSyringe filled. Solution: {sol}, flow: {flows[sol]}")
         else:
             del mixRatio_vol[sol]
 
-    ## Check, that all flows are above the minimum flow of their syringe, adjust them otherwise and raise a Warning
+    ## Check, that all flows are above the minimum flow of their syringe(future plan: adjust them otherwise and raise a Warning)
     if not (flowsOK[False] == {}):
         raise ValueError(f"The following flows are outside of the syringe limits: {flowsOK}")
         # TODO: Include the adjustment of the flows and raise warning below instead of the error above.
@@ -233,75 +294,133 @@ def mix(mixingRatio:dict, fraction:str, pumps:dict, valves:dict, via=[], chemica
         print('flow', flows[sol], 'setflow', setFlow)
         spump.generate_flow(setFlow)
     
-    ## Wait until the dead volume of the path from the pump to the endpoint with the largest dead volume is pumped 1.2 times
-    # Get the maximum dead volume
-    dV_max = max(dV)
-    print('dV_max', dV_max)
-    # Wait until dV_max is pumped 1.2 times with flow
-    timer2 = qmixbus.PollingTimer(period_ms = (1.2*dV_max/flow)*1000.)
+    # Wait for 3 seconds
+    timer2 = qmixbus.PollingTimer(period_ms = 3000.)
     timer2.wait_until(timer2.is_expired, True)
 
     # Return to mL/s flow units to revert to standard settings
     spump.set_flow_unit(prefix=flow_unit_prior.prefix, volume_unit=flow_unit_prior.unitid, time_unit=flow_unit_prior.time_unitid)
 
     # Collect the actual flows
+    logmsg = []
     flows_actual = {}
+    pumpsFlows = {}
     for sol in flows.keys():
         solutionPump = solutionsDict[sol].pump
         flows_actual[sol] = pumps[solutionPump].get_flow_is()
+        pumpsFlows[solutionPump] = flows_actual[sol]
         print('actual flow', pumps[solutionPump].get_flow_is())
         print('target flow', flows[sol])
+        logmsg.append(f"{sol}: \n actual flow: {pumps[solutionPump].get_flow_is()} \n target flow as calculated: {flows[sol]}")
+    logmsg = "\n".join(logmsg)
+    logger_CetoniDevice_action.info(f"{mix.__name__}\n{logmsg}")
+    logger_CetoniDevice_action.info(f"{mix.__name__} Results"
+                                    f"requested mixing ratio [mol/mol]:\t{mixRatio_request}\n"
+                                    f"volumetric mixing ratio [vol/vol]:\t{mixRatio_vol}\n"
+                                    f"calculated mixing ratio based on volumetric mixing ratio [mol/mol]:\t{calcMix_request}\n"
+                                    f"minimum squared error between the input and the calculated values: {minSquaredError}\n"
+                                    f"actual flows as set: {flows_actual}\n"
+                                    f"total flow: {flow}"
+                                    )
 
-    return mixRatio_request, mixRatio_vol, calcMix_request, flows_actual
+    # Stop the pumps to hinder dripping of the system when providing the sample
+    # to a device
+    CetoniDevice_driver.pumpObj.stop_all_pumps()
+    return mixRatio_request, mixRatio_vol, calcMix_request, flows_actual, pumpsFlows
 
-def provideSample(measurementtype:str, sample_node:str, pumps:dict, valves:dict, endpoint:str=conf["CetoniDevice"]["waste"]) -> None:
+def provideSample(
+                measurementtype:Union[str,None],
+                sample_node:str,
+                pumpsFlows:dict,
+                pumps:dict,
+                valves:dict,
+                volume:Union[float,None]=None,
+                endpoint:str=conf["CetoniDevice"]["waste"]
+                ) -> dict:
     ''' This function moves the sample to the requested device.
     
     Inputs:
     measurementtype: a string specifying the device, to which the sample shall be supplied, e.g. densiVisco, nmr, uvVis
+    volume: a float giving the volume to be pumped in mL; this is only used, if the measurementtype is None
     sample_node: a string giving the name of the node, from where the sample shall be directed towards the device
+    pumpsFlows: a dictionary containing all the flows to be set when providing the 
+                sample; keys are names of pumps, values are the flows
     pumps: a dictionary containing all the pumps in the system with the names of the pumps as keys and the pump objects as values
     valves: a dictionary containing all the valves in the system with the names of the valves as keys and the valve objects as values
     endpoint: a string giving the name of a node, where the sample shall end up. This could be the waste or another node representing an additional reservoir, which can be reached.
 
     Outputs:
-    This function has not outputs. '''
-    # TODO: Test this function!!!
+    actualFlows: a dictionary containing the actual flow for each pump. The key is the
+                name fo the pump and the value is the flow. '''
     
     ## Check the input types
     typeCheck(func=provideSample, locals=locals())  # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
-    
-    # Find a path from the sample_node to the inlet of the device
-    pathSIN = graph.findPath(start_node=sample_node, end_node=f"{measurementtype}IN")
-    # Find a path from the outlet of the device to the waste
-    pathOUTE = graph.findPath(start_node=f"{measurementtype}OUT", end_node=endpoint)
-    # Assemble the total path
-    pathTotal = pathSIN + pathOUTE
-    # Check the validity of pathTotal and if it is valid, switch the valves accordingly
-    if graph.pathIsValid(pathTotal):
-        switchValves(nodelist=pathTotal, valvesDict=valves)
+
+    if measurementtype is not None:
+        # Find a path from the sample_node to the endpoint via the device
+        path = graph.findPath(start_node=sample_node, end_node=endpoint,
+                                via=[f"{measurementtype}IN", f"{measurementtype}OUT"])
+        # Get only the part to the inlet of the instrument for later determination of
+        # the waiting time
+        pathSIN = graph.findPath(start_node=sample_node, end_node=f"{measurementtype}IN")
     else:
-        raise ValueError("The total path is not valid.")
-    # Get the currently pumping pumps
-    pumpingPs = CetoniDevice_driver.cetoni.pumpingPumps(pumpsDict = pumps)
-    ## Switch the valves from the pumps, which are pumping, to the sample_node to avoid the sample to be pumped to the endpoint directly
-    for p in pumpingPs:
+        # Find a path from the sample_node to the endpoint
+        path = graph.findPath(start_node=sample_node, end_node=endpoint, weight="length")
+        
+    # Switch the valves to the path from the sample point to the endpoint if applicable through the device
+    switchValves(nodelist=path, valvesDict=valves)
+    ## Switch the valves from the pumps, which are involved, to the sample_node
+    # to provide the sample to the endpoint
+    for p in pumpsFlows.keys():
         # find a path from the pump to the sample_node
         pathPN = graph.findPath(start_node=p, end_node=sample_node)
         # switch the valves for this pump so that it pumps towards the sample_node
         switchValves(nodelist=pathPN, valvesDict=valves)
-    ## Wait until the volume required for the measurement is pumped 1.5 times or the first pump stops pumping and stop the flow
+    # Restart the pumps and collect their flows to report them
+    actualFlows = {}
+    for pump in pumpsFlows.keys():
+        pumps[pump].generate_flow(pumpsFlows[pump])
+        actualFlows[pump] = pumps[pump].get_flow_is()
+
+    ## Wait until the volume required for the measurement is pumped or the
+    # first pump stops pumping and stop all pumps
+    if measurementtype is not None:
+        volToPump = (graph.getTotalQuantity(nodelist=pathSIN, quantity="dead_volume") +
+                    conf["CetoniDevice"]["measureVolumes"][measurementtype])
+    else:
+        volToPump = (graph.getTotalQuantity(nodelist=path, quantity="dead_volume") +
+                    volume)
+
     # Initialize a timer
-    timer = qmixbus.PollingTimer(period_ms = 1.5 * 1000. *((graph.getTotalQuantity(nodelist=pathSIN, quantity="dead_volume") + conf["CetoniDevice"]["measureVolumes"][measurementtype])/conf["CetoniDeviceDriver"]["flow"]))
-    print("volume to be pumped: ", graph.getTotalQuantity(nodelist=pathSIN, quantity="dead_volume") + conf["CetoniDevice"]["measureVolumes"][measurementtype])
+    timeToWait = (volToPump)/conf["CetoniDeviceDriver"]["flow"]
+    timer = qmixbus.PollingTimer(period_ms = 1000. * timeToWait)
+    print("volume to be pumped: ", volToPump)
     print(f"time to be waited: {timer.get_msecs_to_expiration()/1000.} s, {timer.get_msecs_to_expiration()/60000.} min")
+    logger_CetoniDevice_action.info(f"{provideSample.__name__}\nProviding sample to {measurementtype}, endpoint: {endpoint}"
+                                    f"volume to be pumped: {volToPump}\n"
+                                    f"time to be waited: {timer.get_msecs_to_expiration()/1000.} s, {timer.get_msecs_to_expiration()/60000.} min")
     # Wait and check the two conditions
-    while (not timer.is_expired()) and (pumpingPs == CetoniDevice_driver.cetoni.pumpingPumps(pumpsDict=pumps)):
+    while ((not timer.is_expired()) and
+        (list(pumpsFlows.keys()) ==
+        CetoniDevice_driver.cetoni.pumpingPumps(pumpsDict=pumps))):
         time.sleep(0.1)
     # Stop all pumps
     CetoniDevice_driver.pumpObj.stop_all_pumps()
+    # drain the residues from the path, if the sample was not provided to a device
+    if measurementtype is None:
+        pathPGtoSampleNode = graph.findPath(start_node="pressurizedGas", end_node=sample_node)
+        pathAmbienttoSampleNode = graph.findPath(start_node="ambient", end_node=sample_node)
+        switchValves(nodelist=path, valvesDict=valves)
+        for i in range(3):
+            switchValves(nodelist=pathPGtoSampleNode, valvesDict=valves)
+            time.sleep(1.)
+            switchValves(nodelist=pathAmbienttoSampleNode, valvesDict=valves)
+            time.sleep(1.)
+
     ## Wait a while for the liquid to get stable
     time.sleep(10)
+    return actualFlows
+
 
 def drainSample(measurementtype:str, pump:str, repeats:int, pumps:dict, valves:dict, gas:str=conf["CetoniDevice"]["gas"], waste:str=conf["CetoniDevice"]["waste"], flow:float=conf["CetoniDeviceDriver"]["flow"]):
     ''' This function drains the sample from a device to the waste after measurement. '''
@@ -331,190 +450,7 @@ def drainSample(measurementtype:str, pump:str, repeats:int, pumps:dict, valves:d
         # wait for the pump to finish pumping
         timer = PollingTimer(period_ms=300000)
         timer.wait_until(pumps[pump].is_pumping, False)
-
-def cleanPath(path:list, pumpsDict:dict, mediumReservoir:str=conf["CetoniDevice"]["gas"], waste:str=conf["CetoniDevice"]["waste"], flow:float=conf["CetoniDeviceDriver"]["flow"], repeats:int=3):
-    ''' This function cleans a path entered as a list of nodes using the medium provided in the mediumReservoir. '''
-    # TODO: test this function
-
-    ## Check the input types
-    typeCheck(func=cleanPath, locals=locals())  # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
-
-
-    # initialise a timer
-    timer = PollingTimer(period_ms=60000)
-    # find the closest pump to the start node of the path
-    p, pathMP = graph.findClosest(node=mediumReservoir, candidates=pumpsDict.keys(), direction='out')
-    # find a path from the pump via the path to the waste
-    pathPW = graph.findPath(start_node=p, end_node=waste, via=path)
-    if graph.pathIsValid(pathPW):
-        for i in range(repeats):
-            switchValves(pathMP)
-            pumpsDict[p].set_fill_level(pumpsDict[p].get_volume_max(), flow)
-            timer.wait_until(pumpsDict[p].is_pumping, False)
-            switchValves(pathPW)
-            pumpsDict[p].set_fill_level(0.0, flow)
-            timer.wait_until(pumpsDict[p].is_pumping, False)
-        # update the system status to note the current filling of the tubes.
-        graph.updateSystemStatus(path=pathPW)
-        return True
-    else:
-        raise ValueError(f'The path from the pump {p} via the path {path} to the waste {waste}: {pathPW} is not valid!')
-
-def clean(pumpsDict:dict, setup:Union[str,nx.DiGraph]=conf["graph"]["savePath_graph"], waste:str=conf["CetoniDevice"]["waste"], gas:str=conf["CetoniDevice"]["gas"], flow:float=conf["CetoniDeviceDriver"]["flow"]):
-    ''' This function cleans the whole pumping system including the tubing and the devices. '''
-    # TODO: Test this function
-
-    ## Check the input types
-    typeCheck(func=clean, locals=locals())  # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
-
-    # Message the user to ensure all open ends are in a container
-    input('Please ensure, that all open ends are positioned inside a waste container.')
-
-    # ensure that setup is a graph
-    setup, positions = graph.getGraph(graph=setup, positions=None)
-
-    # initialise a timer
-    timer = PollingTimer(period_ms=60000)
-
-    ## Drain residues from syringe using gas
-    # aspirate gas to all pumps, dispense to waste, do this two times
-    for p in pumpsDict.keys():
-        # find a path from each pump to the waste
-        path = graph.findPath(start_node=p, end_node=waste)
-        # clean the path three times using gas
-        cleanPath(path=path, pumpsDict=pumpsDict, mediumReservoir='ambient', repeats=3)
-
-    ## Clean the devices
-    # identify the devices
-    devices = [n[:-2] for n in list(setup.nodes()) if 'IN' in n]
-    print('devices', devices)
-    ## Iterate through the devices and clean each of them
-    for d in devices:
-        pathIO = graph.findPath(start_node=f'{d}IN', end_node=f'{d}OUT', repeats=3)
-    
-    ## Clean the open ends except reservoirs and solvents
-    # find the open ends in the graph
-    openEnds = graph.getOpenEnds(setup)
-
-    # Exclude solvents and reservoirs to clean them last
-    # find a path to each open end
-    # for oe in openEnds:
-    #     pathPO = graph.findClosest()
-
-    # clean the paths
-
-    ## Clean the solvents
-
-    ## Clean the reservoirs
-
-    # report done
-
-def emptySyringes(pumps:dict, valves:dict, waste:str=conf["CetoniDevice"]["waste"], gas:str=conf["CetoniDevice"]["gas"], repeats:int = 3):
-    ''' This function removes remaining liquid from all the pumps in the system, by aspirating it into one pump and dispensing it from there to the waste. '''
-    # TODO: Test this function
-    
-    ## Check the input types
-    typeCheck(func=emptySyringes, locals=locals())  # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
-    
-    # Initialize a timer
-    timer = qmixbus.PollingTimer(period_ms=120000)
-    # Find candidates with a volume as large as possible for collecting the remainders
-    collect_candidates = graph.findPumps(pumps=pumps, status="target=='empty'", secondary={"maximumVolume": np.max})
-    # Choose the candidate closest to the waste
-    collect, pathCW = graph.findClosest(node=waste, candidates=list(collect_candidates.keys()), direction="in")
-    # Set the status of collect to occupied
-    pumps[collect].status = "occupied"
-    # Find candidates with a volume as large as possible for assisting in cleaing the collection pump afterwards
-    assist_candidates = graph.findPumps(pumps=pumps, status="target=='empty'", secondary={"maximumVolume": np.max})
-    # Choose the assist pump closest to collect
-    assist, pathCA = graph.findClosest(node=collect, candidates=list(assist_candidates.keys()), direction="in")
-    # Set the status of assis to occupied
-    pumps[assist].status = "occupied"
-    for n in range(repeats):
-        # Go through all the pumps
-        for pump in pumps.keys():
-            if (pumps[pump].name != collect):
-                # Get the fill level of collect
-                level_collect = pumps[collect].get_fill_level()
-                # Find a path from pump to collect
-                pathAsp = graph.findPath(start_node=pumps[pump].name, end_node=collect, weight="dead_volume")
-                # Get the volume of pathAsp
-                dV_pathAsp = graph.getTotalQuantity(nodelist=pathAsp, quantity="dead_volume")
-                # Check, if the next level exceeds the maximum fill level of collect
-                if level_collect+dV_pathAsp*1.5 > pumps[collect].get_volume_max():
-                    # If it exceeds the volume, dispense to the waste
-                    # Switch the valves according to pathCW
-                    switchValves(nodelist=pathCW, valvesDict=valves)
-                    # Dispense the collected remainings to the waste
-                    pumps[collect].set_fill_level(level=0.0, flow=pumps[collect].get_flow_rate_max()/5.)
-                    # Wait for the pump to finish pumping
-                    timer.wait_until(pumps[collect].is_pumping, False)
-                    # Get the new fill level of collect
-                    level_collect = pumps[collect].get_fill_level()
-                # Switch the valves according to pathAsp
-                switchValves(nodelist=pathAsp, valvesDict= valves)
-                # Aspirate dV_pathAsp*1.5 to collect
-                pumps[collect].set_fill_level(level=level_collect+dV_pathAsp*1.5, flow=0.03)
-                # Wait for the pump to finish pumping
-                timer.wait_until(pumps[collect].is_pumping, False)
-    # Switch the valves according to pathCW
-    switchValves(nodelist=pathCW, valvesDict=valves)
-    # Dispense the collected remainings to the waste
-    pumps[collect].set_fill_level(level=0.0, flow=pumps[collect].get_flow_rate_max()/5.)
-    # Wait for the pump to finish pumping
-    timer.wait_until(pumps[collect].is_pumping, False)
-
-    ## Aspirate gas to assist
-    # Find a path from gas to assist
-    pathGA = graph.findPath(start_node=gas, end_node=assist, weight="dead_volume")
-    # Switch the valves according to pathGA
-    switchValves(nodelist=pathGA, valvesDict=valves)
-    # Aspirate half the volume of assist or collect, whichever is smaller
-    pumps[assist].set_fill_level(level=np.min([pumps[assist].get_volume_max()/2., pumps[collect].get_volume_max()/2.]), flow=pumps[assist].get_flow_rate_max()/5.)
-    # Wait for the pump to finish pumping
-    timer.wait_until(pumps[assist].is_pumping, False)
-
-    ## Aspirate from collect in the direction of assist
-    # Get the fill level of assist
-    level_assist = pumps[assist].get_fill_level()
-    # Find a path from collect to assist
-    pathCA = graph.findPath(start_node=collect, end_node=assist)
-    # Get the volume of pathCA
-    dV_pathCA = graph.getTotalQuantity(nodelist=pathCA, quantity="dead_volume")
-    # Switch the valves according to pathCA
-    switchValves(nodelist=pathCA, valvesDict=valves)
-    # Aspirate two thirds of the volume of pathCA to assist
-    pumps[assist].set_fill_level(level=level_assist+(2.*dV_pathCA/3.), flow=0.03)
-    # Wait for the pump to finish pumping
-    timer.wait_until(pumps[assist].is_pumping, False)
-
-    ## Dispense from assist to waste
-    # Find a path from assist to waste
-    pathAW = graph.findPath(start_node=assist, end_node=waste)
-    # Switch the valves according to pathAW
-    switchValves(nodelist=pathAW, valvesDict=valves)
-    # Dispense from assist to waste
-    pumps[assist].set_fill_level(level=0.0, flow=pumps[assist].get_flow_rate_max()/5.)
-    # Wait for the pump to finish pumping
-    timer.wait_until(pumps[assist].is_pumping, False)
-
-    ## Switch every pump to gas and release the pressure generated in the system
-    # Go through all the pumps
-    for pump in pumps.keys():
-        # Find a path from gas to pump
-        pathGP = graph.findPath(start_node=gas, end_node=pump)
-        # switch the valves according to pathGP
-        switchValves(nodelist=pathGP, valvesDict=valves)
-        # Aspirate gas to pump
-        pumps[pump].set_fill_level(level=repeats*dV_pathAsp*1.5, flow=pumps[pump].get_flow_rate_max()/5.)
-        # Wait for the pump to finish pumping
-        timer.wait_until(pumps[pump].is_pumping, False)
-        # Switch the valves to the path from pump to collect
-        switchValves(nodelist=pathAsp, valvesDict=valves)
-        # Dispense the gas to pathAsp without moving the collect pump
-        pumps[pump].set_fill_level(level=0.0, flow=0.03)
-        # Wait for the pump to finish pumping
-        timer.wait_until(pumps[pump].is_pumping, False)
+    logger_CetoniDevice_action.info(f"{drainSample.__name__}\nSample drained from device {measurementtype}.")
 
 def switchValves(nodelist:list, valvesDict:dict, settings:dict={}, valvePositionDict:Union[dict,str]=conf["CetoniDeviceDriver"]["valvePositionDict"]):
     ''' This function gets the valve positions required to realize a certain path and switches the valves accordingly. '''
@@ -531,20 +467,26 @@ def switchValves(nodelist:list, valvesDict:dict, settings:dict={}, valvePosition
     else:
         # If settings is given, use these settings
         valveSettings = settings
-    print("Valves switched to the following positions: \n")
+    print("\nValves switched to the following positions:")
+    logmsg = ["Valves switched to the following positions:"]
     # For every valve
     for valve in valveSettings.keys():
         if valve in valvePositionDict.keys():
             # Change the valve position according to the settings
             valvesDict[valve].switch_valve_to_position(valveSettings[valve])
             # Print how the valves are switched
-            print(f"{valve}: {valvesDict[valve].actual_valve_position()}")
+            print(f"\t{valve}: {valvesDict[valve].actual_valve_position()}")
+            logmsg.append(f"{valve}: {valvesDict[valve].actual_valve_position()}")
+    logmsg = "\n".join(logmsg)
+    logger_CetoniDevice_action.info(f"{switchValves.__name__}\npath\t{nodelist}\n\n{logmsg}")
 
-def fillSyringe(pump:pumpObj, volume:float,valvesDict:dict, reservoir:str, tolerance:float=3.,  waste:str=conf["CetoniDevice"]["waste"], flow:float=conf["CetoniDeviceDriver"]["flow"], setup=conf["graph"]["savePath_graph"], valvePositionDict:str=conf["CetoniDeviceDriver"]["valvePositionDict"], simulateBalance:bool=conf["CetoniDeviceDriver"]["simulateBalance"]):
+def fillSyringe(pump:pumpObj, volume:float, valvesDict:dict, reservoir:str, tolerance:float=3.,  waste:str=conf["CetoniDevice"]["waste"], flow:float=conf["CetoniDeviceDriver"]["flow"], setup:str=conf["graph"]["savePath_graph"], valvePositionDict:str=conf["CetoniDeviceDriver"]["valvePositionDict"], simulateBalance:bool=conf["CetoniDeviceDriver"]["simulateBalance"]):
     ''' This function ensures that the syringe does not contain gas, but only liquid. '''
         
     ## Check the input types
     typeCheck(func=fillSyringe, locals=locals())  # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
+
+    logger_CetoniDevice_action.info(msg=f"{fillSyringe.__name__}\nFilling syringe {pump.name} from {reservoir}")
 
     # Get the valvePositionDict
     valvePositionDict = getValvePositionDict(vPd=valvePositionDict)
@@ -577,7 +519,6 @@ def fillSyringe(pump:pumpObj, volume:float,valvesDict:dict, reservoir:str, toler
     pathRP = graph.findPath(start_node=reservoir, end_node=pump.name, valvePositionDict=valvePositionDict, graph=setup)
     # initialize filling_full
     filling_full = 0.0
-    # TODO: enter here to add a while loop for the final volume < vol-tolerance
     # As long as the syringe is not sufficiently filled, repeat the process of filling and dispensing liquid.
     while filling_full < volume-tolerance:
         # Switch the valves according to pathRP
@@ -631,206 +572,35 @@ def fillSyringe(pump:pumpObj, volume:float,valvesDict:dict, reservoir:str, toler
         # Check, if the pump stopped due to the lower volume limit
         if pump.get_fill_level() <= limit_level:
             # Print a message, if the lower limit was hit
-            print("The syringe seems to be empty. Please check the cause for that.")
+            raise ValueError(
+                f"The syringe of pump {pump} seems to be empty. "
+                "Please check the cause for that. "
+                f"Likely reservoir {reservoir} is empty.")
         # Get the current fill level of the pump
         filling_full = pump.get_fill_level()
 
     # Switch the valves back to the initial positions
     switchValves(nodelist=[], settings=origValvePos, valvesDict=valvesDict, valvePositionDict=valvePositionDict)
+    logger_CetoniDevice_action.info(f"{fillSyringe.__name__}\nSyringe filled up to the level {filling_full}.")
     # Return the fill level of the pump
-    return filling_full # -> TODO: Define a deviation from the requested volume that is acceptable and repeat the process, if the fill level is lower.
+    return filling_full
 
-def cleanMixingsystem(pumpsDict:dict, valvesDict:dict, medium1:str, intermediate:bool = True, medium2:str=conf["CetoniDevice"]["gas"], waste=conf["CetoniDevice"]["waste"], paths=conf["CetoniDevice"]["pathsToClean"], valvePositionDict:Union[dict,str]=conf["CetoniDeviceDriver"]["valvePositionDict"], setup:str=conf["graph"]["savePath_graph"], flow:float=conf["CetoniDeviceDriver"]["flow"], repeats:int = 3):
-    ''' This function cleans the used paths of an experiment first using solvent and subsequently using gas. It is intended to be used after small experiments, where a cleaning of the full
-    system will not be reasonable. The variable intermediate determines, if it is a final cleaning after finishing experiments (False) or if it is an intermediate cleaning in between experiments (True). It requires all the tubing, which is not solvent and not gas to be put to the waste. '''
-    # TODO: Test this function!!! TODO: Pump all the remainders in the pumps to one pump and again to the waste in order to reduce the remaining amount of solvent.
-    input("Please confirm that all tubes except the ones for the cleaning media are put to the waste.")
-
-    ## Check the input types
-    typeCheck(func=cleanMixingsystem, locals=locals())  # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
-    
-    # Get the valvePositionDict
-    valvePositionDict = getValvePositionDict(vPd=valvePositionDict)
-    # Get the setup
-    setup, positions = graph.getGraph(graph=setup, positions=None)
-
-    timer = qmixbus.PollingTimer(180000)
-    # Go through all paths
-    for path in tqdm(paths):
-        print(path)
-        # Get the dead volume of the path to clean
-        dV_path = graph.getTotalQuantity(nodelist=path, quantity="dead_volume")
-        # If the path is a simple path starting from a pump and ending in a reservoir
-        if (path[0] in list(pumpsDict.keys())) and ("Reservoir" in path[-1]):
-            # The path can stay as it is only, if both media are not in the path.
-            if (medium1 not in path) and (medium2 not in path) and not intermediate: # -> TODO: find an alternative reservoir to put the waste
-                path = path
-            # If one of the media is contained in the path, the final reservoir needs to be changed to the waste
-            else:
-                print("startReplacement", path[-3])
-                replacement = graph.findPath(start_node=path[-3], end_node=waste)
-                path=path[0:-3]+replacement
-            print(path)
-            # Clean first with medium1 and afterwards with medium2
-            for medium in [medium1, medium2]:
-                # Clean n times with the respective medium
-                for n in range(repeats):
-                    print("n:", n)
-                    print("pump", path[0])
-                    print("path:", path)
-                    # Get the path to aspirate the medium
-                    aspPath = graph.findPath(start_node=medium, end_node=path[0], valvePositionDict=valvePositionDict, graph=setup, weight="dead_volume")
-                    # Switch valves to aspirate medium
-                    switchValves(nodelist=aspPath, settings={}, valvesDict=valvesDict, valvePositionDict=valvePositionDict)
-                    print("aspPath", aspPath)
-                    # Fill the syringe with the medium.
-                    pumpsDict[path[0]].set_fill_level(level=np.min([3.*dV_path, pumpsDict[path[0]].get_volume_max()]), flow=pumpsDict[path[0]].get_flow_rate_max()/5.)
-                    print(np.min([3., pumpsDict[path[0]].get_volume_max()]))
-                    # Wait for the pump to finish pumping
-                    timer.restart()
-                    timer.wait_until(pumpsDict[path[0]].is_pumping, False)
-                    # Switch valves to path to be cleaned.
-                    switchValves(nodelist=path, settings={}, valvesDict=valvesDict, valvePositionDict=valvePositionDict)
-                    # Empty the syringe through the path to be cleaned.
-                    pumpsDict[path[0]].set_fill_level(level=0.0, flow=pumpsDict[path[0]].get_flow_rate_max()/5.)
-                    # Wait for the pump to finish pumping
-                    timer.restart()
-                    timer.wait_until(pumpsDict[path[0]].is_pumping, False)
-        # If the path is a loop starting from a pump and ending in a pump
-        elif (path[0] in list(pumpsDict.keys())) and (path[-1] in list(pumpsDict.keys())):
-            # If none of the media is in the path, clean the path
-            if (medium1 not in path) and (medium2 not in path):
-                # Clean first with medium1 and afterwards with medium2
-                for medium in [medium1, medium2]:
-                    # Clean n times with the respective medium
-                    for n in range(repeats):
-                        # Find a path to aspirate the medium in path[0]
-                        pathMS = graph.findPath(start_node=medium, end_node=path[0])
-                        # Switch the valves to aspirate the medium in path[0]
-                        switchValves(nodelist=pathMS, valvesDict=valvesDict)
-                        # Aspirate the medium in path[0]
-                        pumpsDict[path[0]].set_fill_level(level=np.min([3.*dV_path, pumpsDict[path[0]].get_volume_max()]), flow=flow)
-                        # Wait for path[0] to finish pumping
-                        timer.wait_until(pumpsDict[path[0]].is_pumping, False)
-                        # Get the fill level of path[0]
-                        level_p0 = pumpsDict[path[0]].get_fill_level()
-                        # Switch the valves according to path
-                        switchValves(nodelist=path, valvesDict=valvesDict)
-                        # Pump from path[0] to path[-1]
-                        pumpsDict[path[0]].set_fill_level(level=0.0, flow=flow)
-                        pumpsDict[path[-1]].set_fill_level(level=level_p0, flow=flow)
-                        # Wait until both pumps have finished pumping
-                        timer.wait_until(pumpsDict[path[0]].is_pumping, False)
-                        timer.wait_until(pumpsDict[path[-1]].is_pumping, False)
-                        # Find a path from path[-1] to waste
-                        pathEW = graph.findPath(start_node=path[-1], end_node=waste)
-                        # Switch the valves according to 
-                        switchValves(pathEW, valvesDict=valvesDict)
-                        # Dispense from path[-1] to the waste
-                        pumpsDict[path[-1]].set_fill_level(level=0.0, flow=flow)
-                        # Wait for the pump to finish pumping
-                        timer.wait_until(pumpsDict[path[-1]].is_pumping, False)
-            # If medium1 or medium2 are in the path, skip this path
-            else:
-                next
-    return True
-
-def cleanInstrument(pumpsDict:dict, valvesDict:dict, instrumenttype:str, medium1:str, pumpIN:str="A0.0", pumpOUT:str="B0.0", medium2:str=conf["CetoniDevice"]["gas"], waste:str=conf["CetoniDevice"]["waste"], repeats:int=3):
-    ''' This function provides the functionality to clean the density and viscosity meter and the NMR. Further applications will be the
-    cleaning of the UV-Vis spectrometer, the mixing chip and other loops in the system. '''
-    # TODO: Test this function!!! TODO: Pump all the remainders in the pumps to one pump and again to the waste in order to reduce the remaining amount of solvent.
-    # TODO: improve the algorithm in order to use as little solvent as possible, but hinder it from remaining in the instrument.
-
-    ## Check the input types
-    typeCheck(func=cleanInstrument, locals=locals())  # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
-
-    instrumentIN = f"{instrumenttype}IN"
-    instrumentOUT = f"{instrumenttype}OUT"
-    # Instatiate a timer
-    timer=qmixbus.PollingTimer(120000)
-    # Get the relevant paths
-    # Get the path from pumpIN through the instrument to pumpOUT
-    pathIN = graph.findPath(pumpIN, instrumentIN)
-    pathOUT = graph.findPath(instrumentOUT, pumpOUT)
-    path = pathIN + pathOUT
-    print(path)
-    # Determine the volume and flow to operate with the given pumps
-    vol = min(5.0, 2.*graph.getTotalQuantity(nodelist=path, quantity="dead_volume"), pumpsDict[pumpIN].get_volume_max(), pumpsDict[pumpOUT].get_volume_max()) 
-    flow = min(pumpsDict[pumpIN].get_flow_rate_max()/5., pumpsDict[pumpOUT].get_flow_rate_max()/5.)
-    # Clean first with medium1, then with medium2
-    for medium in [medium1, medium2]:
-        # Initialize the pumps
-        pumpIN_new = pumpIN
-        pumpOUT_new = pumpOUT
-        # Find a path to aspirate the medium in pumpIN_new
-        pathMI = graph.findPath(medium, pumpIN_new)
-        # Switch the valves to aspirate the medium in pumpIN_new
-        switchValves(nodelist=pathMI, valvesDict=valvesDict)
-        # Aspirate the medium in pumpIN_new
-        pumpsDict[pumpIN_new].set_fill_level(level=vol, flow=flow)
-        # Wait for pumpIN_new to finish pumping
-        timer.wait_until(pumpsDict[pumpIN_new].is_pumping, False)
-        # Clean n times pumping the liquid between input and output
-        for n in range(repeats):
-            # Switch the valves according to path
-            switchValves(nodelist=path, valvesDict=valvesDict)
-            # Pump from pumpIN_new to pumpOUT_new
-            pumpsDict[pumpIN_new].set_fill_level(level=0.0, flow=flow)
-            pumpsDict[pumpOUT_new].set_fill_level(level=vol, flow=flow)
-            # Wait until both pumps have finished pumping
-            timer.wait_until(pumpsDict[pumpIN_new].is_pumping, False)
-            timer.wait_until(pumpsDict[pumpOUT_new].is_pumping, False)
-            # If it is not the last round
-            if n != repeats-1:
-                # Exchange input and output pumps
-                pumpIN_new, pumpOUT_new = pumpOUT_new, pumpIN_new
-            else:
-                print(n)
-                # Do not exchange input and output pumps
-                pumpIN_new, pumpOUT_new = pumpIN_new, pumpOUT_new
-            print(pumpIN_new, pumpOUT_new)
-            # Find new paths for input and output
-            pathIN = graph.findPath(pumpIN_new, instrumentIN)
-            pathOUT = graph.findPath(instrumentOUT, pumpOUT_new)
-            path = pathIN + pathOUT
-            print(path)
-        # Get a path from pumpOUT_new to the waste
-        pathOW=graph.findPath(pumpOUT_new, waste)
-        # Switch the valves according to pathOW
-        switchValves(pathOW, valvesDict=valvesDict)
-        # Dispense from pumpOUT_new to the waste
-        pumpsDict[pumpOUT_new].set_fill_level(level=0.0, flow=flow)
-        # Wait for the pump to finish pumping
-        timer.wait_until(pumpsDict[pumpOUT_new].is_pumping, False)
-    return True
-
-def cleanAll(pumpsDict:dict, valvesDict:dict, medium1:str, intermediate:bool=True, medium2:str=conf["CetoniDevice"]["gas"], repeat:int=3):
-    ''' This function cleans the full system. This means it cleans all aspirationpaths and dispense paths in the mixing region and additionally,
-    it cleans all the loops going to analysis systems. '''
-    # TODO: Test this function!!!
-
-    ## Check the input types
-    typeCheck(func=cleanAll, locals=locals())  # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
-
-    all = ["densiVisco", "uvVis"]
-    for inst in all:
-        cleanInstrument(pumpsDict=pumpsDict, valvesDict=valvesDict, instrumenttype=inst, medium1=medium1, medium2=medium2, repeats=repeat)
-    cleanMixingsystem(medium1=medium1, intermediate=intermediate, medium2=medium2, pumpsDict=pumpsDict, valvesDict=valvesDict, repeats=repeat)
-    emptySyringes(pumps=pumpsDict, valves=valvesDict)
-    goToRefPos(pumpsDict=pumpsDict, valvesDict=valvesDict, mode="end")
-    return True
-
-def goToRefPos(pumpsDict:dict, valvesDict:dict, mode:str, gas:str=conf["CetoniDevice"]["gas"], waste:str=conf["CetoniDevice"]["waste"]):
-    ''' This function moves the syringes to their reference positions. This means that they move to 2 mL or half their size, depending on what is the smaller value. This
-    is done before leaving the machine in order to have remaining fluid inside the syringes as much as possible and keeping it away from other components like valves, if
-    it is avoidable. '''
-    # TODO: Test this function!!!
+def goToRefPos(pumpsDict:dict, valvesDict:dict, mode:str,
+               gas:str=conf["CetoniDevice"]["gas"],
+               waste:str=conf["CetoniDevice"]["waste"],
+               flow:float=conf["CetoniDeviceDriver"]["flow"]):
+    ''' This function moves the syringes to their reference positions. This means that
+    they move to 2 mL or half their size, depending on what is the smaller value. This
+    is done before leaving the machine in order to have remaining fluid inside the
+    syringes as much as possible and keeping it away from other components like valves,
+    if it is avoidable. '''
+    # TODO: add a check to ensure, that paths are not affecting each other
     
     ## Check the input types
     typeCheck(func=goToRefPos, locals=locals()) # https://stackoverflow.com/questions/28371042/get-function-parameters-as-dictionary
     
-    timer = qmixbus.PollingTimer(120000)
     for p in list(pumpsDict.keys()):
+        levelNow = pumpsDict[p].get_fill_level()
         try:
             if mode == "end":
                 level = np.min([2.0, pumpsDict[p].get_volume_max()/2.])
@@ -838,9 +608,705 @@ def goToRefPos(pumpsDict:dict, valvesDict:dict, mode:str, gas:str=conf["CetoniDe
             elif mode == "start":
                 level = 0.0
                 path = graph.findPath(p, waste)
-            switchValves(path, valvesDict=valvesDict)
-            pumpsDict[p].set_fill_level(level, pumpsDict[p].get_flow_rate_max()/5.)
+            levelDifference = level - levelNow
+            directionality = graph.getDirectionality(path=path, node=p)
+            if (((directionality == "in") and (levelDifference >= 0))
+                or ((directionality == "out") and (levelDifference <= 0))):
+                switchValves(nodelist=path, valvesDict=valvesDict)
+            elif ((directionality == "in") and (levelDifference < 0)):
+                correctedPath_in = graph.findPath(start_node=p, end_node=waste)
+                switchValves(nodelist=correctedPath_in, valvesDict=valvesDict)
+            elif ((directionality == "out") and (levelDifference > 0)):
+                correctedPath_out = graph.findPath(start_node=gas, end_node=p)
+                switchValves(nodelist=correctedPath_out, valvesDict=valvesDict)
+            pumpsDict[p].set_fill_level(level, flow)
         except (NodeNotFound, NetworkXNoPath) as e:
+            print(e)
             pass
-    # Only wait for the last pump, as now each pump has its own waste and gas line
-    timer.wait_until(pumpsDict[p].is_pumping, False)
+    # One time waiting is enough as now each pump has its own waste and gas line
+    # It needs to be waited until the last pump (the pump with the largest volume change
+    # to do is done pumping)
+    while len(CetoniDevice_driver.cetoni.pumpingPumps(pumpsDict = pumpsDict)) > 0:
+        time.sleep(0.1)
+
+def singlePumpClean(pumpsPathsDict:dict, medium:str, pumpsDict:dict, valvesDict:dict,
+                    goToRef:bool=True, repeats:int=3,
+                    flow:float=conf["CetoniDeviceDriver"]["flow"],
+                    setup:str=conf["graph"]["savePath_graph"]) -> Tuple[list,list]:
+    ''' This function allows to clean paths using a single pump drivign the flow.
+    
+    Inputs:
+    pumpsPathsDict: a dictionary with the names of pumps as keys and the path to clean
+    with this pump as a value
+    medium: the name of a node, from where the cleaning medium shall be aspirated
+    pumpsDict: a dictionary containing the names of the pumps as keys and the pump
+    objects present in the setup as values
+    valvesDict: a dictionary containing valve names as keys and valves as values
+    goToRef: a boolean specifying, whether all pumps in the system shall go to the
+    start position (piston all the way in) prior to starting the cleaning
+    repeats: an integer defining the number of cleaning cycles
+    flow: a floating point number defining the volume flow to be used in the system
+    during the cleaning
+    setup: a string, dictionary, or a graph object representing the graph to be used
+    to determine the paths
+
+    Outputs:
+    pathsNotCleaned: a list of the paths, which were not cleaned
+    pathsCleaned: a list of the paths, which were cleaned '''
+
+
+    # Check the input types
+    typeCheck(func=singlePumpClean, locals=locals())
+
+    # Initialize a timer
+    timer = PollingTimer(period_ms=60000)
+
+    # Get the graph
+    setup, pos = graph.getGraph(graph=setup, positions=None)
+
+    # Go to the reference position, if this is requested
+    if goToRef:
+        goToRefPos(pumpsDict=pumpsDict, valvesDict=valvesDict, mode="start")
+
+    if not graph.pathsCompatible(pathsList=list(pumpsPathsDict.values())):
+        raise ValueError("The paths are not compatible and cannot be cleaned in one"
+                         "step. Please request them in separate groups.")
+
+    # check, if the requested medium is gas or not
+    nodesWithGas = [conf["CetoniDevice"]["gas"], "pressurizedGas"]
+    mediumNoGas = medium not in nodesWithGas
+    logger_CetoniDevice_action.info(f"{singlePumpClean.__name__} \n"
+                                    f"Medium is not a gas: {mediumNoGas}")
+
+    # Find all the open ends in the graph
+    openEnds = graph.getOpenEnds(graph=setup)
+    # Filter out pumps, the medium itself and nodes connected to gas
+    openEndsReduced = [oE for oE in openEnds if (
+                                    (oE not in pumpsDict.keys())
+                                    and (oE != medium)
+                                    and (oE not in nodesWithGas))]
+    # If the medium is not gas, also filter out the open ends at valves to
+    # avoid pumping solvent to these ends
+    if mediumNoGas:
+        openEndsReduced = [oeNoGas for oeNoGas in openEndsReduced
+                            if ((type(graph.getValveFromName(oeNoGas))!=str))]
+    # Collect the not cleaned paths
+    pathsNotCleaned = []
+    # Collect the cleaned paths
+    pathsCleaned = []
+    # Restructure the pumpsPathsDict so it can also store the path from the medium to
+    # the pump
+    pumpsPaths = {}
+    for k in pumpsPathsDict.keys():
+        pumpsPaths[k] = {"path": pumpsPathsDict[k]}
+
+    for i in range(repeats):
+        print(f"\n\n single pump clean {i+1}/{repeats} \n\n")
+        for pump in pumpsPathsDict.keys():
+            # find a path to aspirate the medium
+            pathMP = graph.findPath(medium, pump)
+            pumpsPaths[pump]["mediumPath"] = pathMP
+            logger_CetoniDevice_action.info(f"{singlePumpClean.__name__}\n"
+                                            f"Repeat: {i+1}/{repeats}\n"
+                                            f"Pump: {pump}\n"
+                                            f"Path from medium to pump: {pathMP}")
+            originalPath = pumpsPaths[pump]["path"]
+            # ensure, that the final node of the path is not an open end or if it is,
+            # the open end is a waste
+            # This is redundant when this function is called from clean, but it is
+            # relevant, if the function is used independently of clean
+            if mediumNoGas:
+                lastNode = originalPath[-1]
+                if (("waste" not in lastNode) and ("Reservoir" not in lastNode)):
+                    try:
+                        pathImproved = graph.findPath(start_node=pump,
+                                            end_node=conf["CetoniDevice"]["waste"],
+                                            via=pumpsPaths[pump]["path"],
+                                            graph=setup)
+                        warnings.warn(f"The path {originalPath} is changed to end in a "
+                                "waste. The following path will be cleaned instead: "
+                                f"{pathImproved}.")
+                    except NetworkXNoPath:
+                        warnings.warn(f"The path {originalPath} does not end in "
+                                        "a waste. Changing it to end in "
+                                        f"{conf['CetoniDevice']['waste']} "
+                                        "was not successful. Trying to change it "
+                                        "to end in an open end at a reservoir or "
+                                        "another waste.")
+                        try:
+                            oEcands = [oec for oec in openEndsReduced
+                                    if (("waste" in oec) or ("Reservoir" in oec))]
+                            closestOpenEnd, pathToClosestOpenEnd = graph.findClosest(
+                                                                    node=lastNode,
+                                                                    candidates=oEcands,
+                                                                    graph=setup)
+                            pathImproved = graph.findPath(start_node=pump,
+                                            end_node=closestOpenEnd,
+                                            via=pumpsPaths[pump]["path"],
+                                            graph=setup)
+                            warnings.warn(f"The path {originalPath} is changed "
+                                        f"to end in {closestOpenEnd} and is now "
+                                        f"{pathImproved}.")
+                        except NetworkXNoPath:
+                            pathImproved = None
+                            pathsNotCleaned.append(originalPath)
+                            warnings.warn(f"The path {originalPath} does not "
+                                            "end in a waste or a reservoir. "
+                                            "Changing it to end in a waste or "
+                                            "an appropriate open end was not "
+                                            "successful. It will be skipped.")
+                    pumpsPaths[pump]["path"] = pathImproved
+            logger_CetoniDevice_action.info(f"{singlePumpClean.__name__}\n"
+                                            "Path to clean: "
+                                            f"{pumpsPaths[pump]['path']}")
+            # switch the valves to the medium
+            switchValves(pumpsPaths[pump]["mediumPath"], valvesDict=valvesDict)
+            # aspirate the medium
+            if mediumNoGas:
+                dV = graph.getTotalQuantity(nodelist=pumpsPaths[pump]["path"],
+                                            quantity="dead_volume")
+                if dV*1.5 <= pumpsDict[pump].get_volume_max():
+                    level = max(dV*1.5, 0.3)
+                else:
+                    level = pumpsDict[pump].get_volume_max()
+            else:
+                level = pumpsDict[pump].get_volume_max()
+            print("volume_to_aspirate:", level)
+            pumpsDict[pump].set_fill_level(level, flow=flow)
+        # wait until the last pump is finished pumping
+        while len(CetoniDevice_driver.cetoni.pumpingPumps(pumpsDict = pumpsDict)) > 0:
+            time.sleep(0.1)
+        # wait longer, if the medium is not a gas
+        if mediumNoGas:
+            timer.wait_until(timer.is_expired, True)
+        for pump in pumpsPaths.keys():
+            # switch the valves to the path, which needs to be cleaned
+            switchValves(pumpsPaths[pump]["path"], valvesDict=valvesDict)
+            # dispense the medium
+            pumpsDict[pump].set_fill_level(0.0, flow=flow)
+            pathsCleaned.append(pumpsPaths[pump]["path"])
+        # wait until the last pump is done pumping
+        while len(CetoniDevice_driver.cetoni.pumpingPumps(pumpsDict = pumpsDict)) > 0:
+            time.sleep(0.1)
+    return pathsNotCleaned, pathsCleaned
+
+def multiPumpClean(path:list, medium:str, pumpsDict:dict, valvesDict:dict,
+                   pumps:Union[list,None]=None, goToRef:bool=True, repeats:int=3,
+                   flow:float=conf["CetoniDeviceDriver"]["flow"],
+                   setup:str=conf["graph"]["savePath_graph"]) -> Tuple[list, list]:
+    ''' This function enables the cleaning of a path using multiple pumps. This is
+    mainly aimed for cleaning of instruments.
+    
+    Inputs:
+    path: a list of strings specifying the path to be cleaned. The path needs to start
+    at a node, which can be reached by all pumps
+          listed in the pumps parameter at the same time (without switching a valve
+          away from another pump).
+    medium: the name of a node, from where the cleaning medium shall be aspirated
+    pumps: a list of strings of pump names defining, which pumps shall be used for
+    the cleaning
+    pumpsDict: a dictionary containing the names of the pumps as keys and the pump
+    objects present in the setup as values
+    valvesDict: a dictionary containing valve names as keys and valves as values
+    goToRef: a boolean specifying, whether all pumps in the system shall go to the
+    start position (piston all the way in) prior to starting the cleaning
+    repeats: an integer defining the number of cleaning cycles
+    flow: a floating point number defining the volume flow to be used in the system
+    during the cleaning
+    setup: a string, dictionary, or a graph object representing the graph to be used
+    to determine the paths
+
+    Outputs:
+    pathsNotCleaned: a list of the paths, which were not cleaned
+    pathsCleaned: a list of the paths, which were cleaned '''
+
+    # Check the input types
+    typeCheck(func=multiPumpClean, locals=locals())
+
+    # Initialize two timers
+    timer = PollingTimer(period_ms=60000)
+
+    # Get the graph
+    setup, pos = graph.getGraph(graph=setup, positions=None)
+
+    # Go to the reference position, if this is requested
+    if goToRef:
+        goToRefPos(pumpsDict=pumpsDict, valvesDict=valvesDict, mode="start")
+
+    # check, if the requested medium is gas or not
+    nodesWithGas = [conf["CetoniDevice"]["gas"], "pressurizedGas"]
+    mediumNoGas = medium not in nodesWithGas
+    logger_CetoniDevice_action.info(f"{multiPumpClean.__name__} \n Medium is not a gas: {mediumNoGas}")
+
+    # Find all the open ends in the graph
+    openEnds = graph.getOpenEnds(graph=setup)
+    # Filter out pumps, the medium itself and nodes connected to gas
+    openEndsReduced = [oE for oE in openEnds if (
+                                    (oE not in pumpsDict.keys())
+                                    and (oE != medium)
+                                    and (oE not in nodesWithGas))]
+    # If the medium is not gas, also filter out the open ends at valves to
+    # avoid pumping solvent to these ends
+    if mediumNoGas:
+        openEndsReduced = [oeNoGas for oeNoGas in openEndsReduced
+                            if ((type(graph.getValveFromName(oeNoGas))!=str))]
+
+    pathsCleaned = []
+    pathsNotCleaned = []
+
+    if mediumNoGas:
+        # ensure, that the final node of the path is not an open end or if it is,
+        # the open end is a waste
+        # This is redundant when this function is called from clean, but it is
+        # relevant, if the function is used independently of clean
+        lastNode = path[-1]
+        if (("waste" not in lastNode) and ("Reservoir" not in lastNode)):
+            try:
+                pathImproved = graph.findPath(start_node=path[0],
+                                    end_node=conf["CetoniDevice"]["waste"],
+                                    via=path[1:],
+                                    graph=setup)
+                warnings.warn(f"The path {path} is changed to end in a "
+                        "waste. The following path will be cleaned instead: "
+                        f"{pathImproved}.")
+            except NetworkXNoPath:
+                warnings.warn(f"The path {path} does not end in "
+                                "a waste. Changing it to end in "
+                                f"{conf['CetoniDevice']['waste']} "
+                                "was not successful. Trying to change it "
+                                "to end in an open end at a reservoir or "
+                                "another waste.")
+                try:
+                    oEcands = [oec for oec in openEndsReduced
+                            if (("waste" in oec) or ("Reservoir" in oec))]
+                    closestOpenEnd, pathToClosestOpenEnd = graph.findClosest(
+                                                            node=lastNode,
+                                                            candidates=oEcands,
+                                                            graph=setup)
+                    pathImproved = graph.findPath(start_node=path[0],
+                                    end_node=closestOpenEnd,
+                                    via=path[1:],
+                                    graph=setup)
+                    warnings.warn(f"The path {path} is changed "
+                                f"to end in {closestOpenEnd} and is now "
+                                f"{pathImproved}.")
+                except NetworkXNoPath:
+                    pathImproved = None
+                    pathsNotCleaned.append(path)
+                    warnings.warn(f"The path {path} does not "
+                                    "end in a waste or a reservoir. "
+                                    "Changing it to end in a waste or "
+                                    "an appropriate open end was not "
+                                    "successful. It cannot be cleaned.")
+            path = pathImproved
+            logger_CetoniDevice_action.info(f"{multiPumpClean.__name__}\n"
+                                    "Path to clean: "
+                                    f"{path}")
+
+    # get the dead volume of the path to clean
+    dV_toClean = graph.getTotalQuantity(nodelist=path, quantity="dead_volume")
+
+    if path is None:
+        return pathsNotCleaned, pathsCleaned
+
+    if pumps is None:
+        pumpsList = list(pumpsDict.keys())
+    else:
+        pumpsList = pumps
+
+    # Initialize the counter and the flow
+    i=0
+    # group the pumps into two groups
+    groupA = pumpsList[0:(int(np.ceil(len(pumpsList)/2)))]
+    groupB = pumpsList[(int(np.ceil(len(pumpsList)/2))):]
+    # get the number of pumps in each group
+    noMembersGroupA = len(groupA)
+    noMembersGroupB = len(groupB)
+    logger_CetoniDevice_action.info(f"{multiPumpClean.__name__} \n group A: {groupA}, group B: {groupB}")
+    # Collect the path to the medium and the path to clean for each pump
+    pumpsPaths = {}
+    for pump in pumpsList:
+        # get the maximum volume of the pump
+        Vmax = pumpsDict[pump].get_volume_max()
+        # get the fraction of the volume, this pump needs to deliver based on the
+        # group size
+        if pump in groupA:
+            fraction = 1./noMembersGroupA
+        else:
+            fraction = 1./noMembersGroupB
+        # if the medium is not a gas, reduce the filling level to not waste
+        # the cleaning medium
+        if mediumNoGas and ((dV_toClean*fraction) <= Vmax):
+            level = dV_toClean*fraction
+        else:
+            level = Vmax
+        pumpsPaths[pump]={
+            "pathMP": graph.findPath(start_node=medium, end_node=pump),
+            "pathClean": graph.findPath(start_node=pump,
+                                        end_node=path[-1],
+                                        via=path[0:-2]),
+            "level": level,
+            "flow": flow*fraction}
+
+    # Ensure, that the paths from the medium and the paths to clean in each group
+    # can be set simultaneously without intersections
+    for group in [groupA, groupB]:
+        pathsToMedium = [pumpsPaths[k]["pathMP"] for k in group]
+        pathsToClean = [pumpsPaths[k]["pathClean"] for k in group]
+        if ((not graph.pathsCompatible(pathsList=pathsToMedium))
+            or
+            (not graph.pathsCompatible(pathsList=pathsToClean))
+        ):
+            raise ValueError(f"The paths are not compatible for group {group}."
+                             "Please change them and try again.")
+
+    # If the medium is not a gas, use the number of repeats as a counter, otherwise do
+    # 5 times the number of repeats
+    if mediumNoGas:
+        count = repeats
+    else:
+        count = 5 * repeats
+
+    while i in range(count):
+        # print the number of the cleaning cycle
+        print(f"\n\n multi pump clean {i+1}/{count} \n\n")
+        # aspirate the medium to the pumps assigned to group A
+        for pump in groupA:
+            # switch the valves to the path found from the medium to the pump
+            switchValves(nodelist=pumpsPaths[pump]["pathMP"], valvesDict=valvesDict)
+            # fill the pump with the cleaning medium
+            pumpsDict[pump].set_fill_level(pumpsPaths[pump]["level"],
+                                           flow=pumpsPaths[pump]["flow"])
+            logger_CetoniDevice_action.info(f"{multiPumpClean.__name__} "
+                                        f"\n Fill level: {pumpsPaths[pump]['level']}")
+        # dispense the medium from the pumps assigned to group B
+        for pump in groupB:
+            # switch the valves according to the path to clean
+            switchValves(nodelist=pumpsPaths[pump]["pathClean"], valvesDict=valvesDict)
+            logger_CetoniDevice_action.info(f"{multiPumpClean.__name__} \n "
+                                f"Path to clean: {pumpsPaths[pump]['pathClean']}")
+            # dispense all the contents of the pump to the path to clean
+            pumpsDict[pump].set_fill_level(0.0, flow=pumpsPaths[pump]["flow"])
+        # wait until all pumps have finished pumping
+        while len(CetoniDevice_driver.cetoni.pumpingPumps(pumpsDict = pumpsDict)) > 0:
+            time.sleep(0.1)
+        # wait longer, if the medium is not a gas
+        if mediumNoGas:
+            timer.wait_until(timer.is_expired, True)
+        
+        pathsCleaned.append(path)
+        groupA, groupB = groupB, groupA
+        i+=1
+
+    return pathsNotCleaned, pathsCleaned
+
+def pressurizedGasClean(nodesToClean:list,
+                        valvesDict:dict,
+                        endNodePath:str=conf["CetoniDevice"]["waste"],
+                        endNodeDrying:str=conf["CetoniDevice"]["wasteForDrying"],
+                        gasNode:str="pressurizedGas",
+                        repeats:int=3,
+                        setup:str=conf["graph"]["savePath_graph"]) -> Tuple[list,list]:
+  
+    # TODO: Find a smart way to identify the node to pass for switching off the gas.
+
+    # Check input types
+    typeCheck(func=pressurizedGasClean, locals=locals())
+
+    # Get the graph
+    setup, pos = graph.getGraph(graph=setup, positions=None)
+
+
+    # try to find a path to the requested node and skip it, if there is no path to this
+    # node
+    pathsCleaned = []
+    pathsNotCleaned = []
+    try:
+        print("check")
+        pathToClean = graph.findPath(
+                        start_node=gasNode,
+                        end_node=endNodePath,
+                        via=nodesToClean)
+
+        pathGasOff = graph.findPath(
+            start_node="ambient",
+            end_node=endNodePath,
+            via=["ArdV_0_1_0.0"] + nodesToClean
+        )
+
+        logger_CetoniDevice_action.info(
+            f"{pressurizedGasClean.__name__} \n"
+            f"Cleaning {nodesToClean} using {pathToClean}."
+            )
+
+        # Switch the valves and turn the flow on
+        for j in range(repeats):
+            print(f"\n\n pressurized gas clean {j+1}/{repeats} \n\n")
+            for i in range(5):
+                switchValves(nodelist=pathToClean, valvesDict=valvesDict)
+                time.sleep(1)
+                switchValves(nodelist=pathGasOff, valvesDict=valvesDict)
+                time.sleep(1)
+            time.sleep(30.)
+            switchValves(nodelist=pathToClean, valvesDict=valvesDict)
+            time.sleep(60.)
+            for i in range(5):
+                switchValves(nodelist=pathToClean, valvesDict=valvesDict)
+                time.sleep(1)
+                switchValves(nodelist=pathGasOff, valvesDict=valvesDict)
+                time.sleep(1)
+            time.sleep(30.)
+        # Dry the path
+        try:
+            pathToDry = graph.findPath(start_node=gasNode,
+                end_node=endNodeDrying,
+                via=nodesToClean)
+        except NetworkXNoPath:
+            pathToDry = pathToClean
+        switchValves(nodelist=pathToDry, valvesDict=valvesDict)
+        time.sleep(180.)
+        switchValves(nodelist=pathGasOff, valvesDict=valvesDict)
+        pathsCleaned.append(pathToClean)
+    except NetworkXNoPath:
+        pathsNotCleaned.append(nodesToClean)
+
+    return pathsNotCleaned, pathsCleaned
+
+def clean(medium:str, pumpsDict:dict, valvesDict:dict, pumps:Union[list, None]=None,
+          nodes:list=['all'], repeats:int=3, goToRef:bool=True,
+          endNode_drying:str=conf["CetoniDevice"]["wasteForDrying"],
+          setup:str=conf["graph"]["savePath_graph"],
+          flow:float=conf["CetoniDeviceDriver"]["flow"]) -> None:
+    ''' This function provides cleaning capabilities of the system. The parameter parts specifies, what shall be cleaned.
+    
+    Inputs:
+    medium: the name of a node, from where the cleaning medium shall be aspirated
+    pumpsDict: a dictionary containing the names of the pumps as keys and the pump objects present in the setup as values
+    valvesDict: a dictionary containing valve names as keys and valves as values
+    pumps: a list of strings of pump names defining, which pumps shall be used for the
+    cleaning. If pumps is None, all pumps will be used for cleaning.
+    nodes: a list of the node names, to where paths need to be cleaned
+    repeats: an integer defining the number of cleaning cycles
+    goToRef: a boolean specifying, whether all pumps in the system shall go to the start position (piston all the way in) prior to starting the cleaning
+    setup: a string, dictionary, or a graph object representing the graph to be used to determine the paths
+    flow: a floating point number defining the volume flow to be used in the system during the cleaning
+
+    Outputs:
+    total_notCleaned: a list of the not cleaned nodes
+    total_cleaned: a list of the cleaned nodes '''
+
+    # TODO: Check for intersections of paths
+
+    # Check the input types
+    typeCheck(func=clean, locals=locals())
+
+    # Initialize a timer
+    timer = PollingTimer(period_ms=200000)
+
+    # Get the graph
+    setup_graph, setup_positions = graph.getGraph(graph=setup, positions=None)
+
+    logger_CetoniDevice_action.info(f"{clean.__name__} \n Cleaning procedure started.")
+
+    # check, if the requested medium is gas or not
+    nodesWithGas = [conf["CetoniDevice"]["gas"], "pressurizedGas"]
+    mediumNoGas = medium not in nodesWithGas
+    logger_CetoniDevice_action.info(f"{clean.__name__} \n"
+                                    f"Medium is not a gas: {mediumNoGas}")
+
+    # Find all the open ends in the graph
+    openEnds = graph.getOpenEnds(graph=setup)
+    # Filter out pumps, the medium itself and nodes connected to gas
+    openEndsReduced = [oE for oE in openEnds if ((oE not in pumpsDict.keys())
+                                                    and (oE != medium)
+                                                    and (oE not in nodesWithGas))]
+    # If the medium is not gas, also filter out the open ends at valves to avoid
+    # pumping solvent to these ends
+    if mediumNoGas:
+        openEndsReduced = [oeNoGas for oeNoGas in openEndsReduced
+                            if ((type(graph.getValveFromName(oeNoGas))!=str))]
+    # Candidates for nodes acceptable as endpoints for the cleaning
+    oEcands = [oec for oec in openEndsReduced
+                if (("waste" in oec) or ("Reservoir" in oec))]
+
+    # Collect the not cleaned nodes
+    nodesNotCleaned = []
+
+    if "all" in nodes:
+        nodes = setup_graph.nodes
+
+    # Filter for the accepted pumps only
+    if pumps is None:
+        pumps = list(pumpsDict.keys())
+
+    # Remove all the nodes related to pumps, the medium itself and the gas
+    # connections
+    nodes_reduced = [n for n in nodes if ((n not in pumpsDict.keys())
+                                                and (n != medium)
+                                                and (n not in nodesWithGas))]
+    # If the medium is not a gas, filter the open ends at valves out, too.
+    if mediumNoGas:
+        nodes_reduced = [n1 for n1 in nodes_reduced if (
+                                (n1 not in openEnds) or
+                                (n1 in openEndsReduced))]
+
+    nodePumpPath = {}
+    instruments = set()
+
+    total_cleaned = set()
+    total_notCleaned = set()
+
+    for node in nodes_reduced:
+        if any(
+            [inst in node for inst in conf['CetoniDevice']['measureVolumes'].keys()]
+            ):
+            instrumentsList = list(instruments)
+            instrumentsList.append(node.rstrip("IN").rstrip("OUT"))
+            instruments = set(instrumentsList)
+        if node in openEndsReduced:
+            closestPump, pathToClosestPump = graph.findClosest(node=node,
+                                                candidates=pumps,
+                                                graph=setup, weight="dead_volume",
+                                                direction="in")
+            if not ((closestPump is None) or (pathToClosestPump is None)):
+                nodePumpPath[node] = {"pump": closestPump,
+                                    "path": pathToClosestPump}
+            else:
+                nodesNotCleaned.append(node)
+        elif (node in openEnds) and not (node in openEndsReduced):
+            nodesNotCleaned.append(node)
+        else:
+            closestPump, pathToClosestPump = graph.findClosest(node=node,
+                                                candidates=pumps,
+                                                graph=setup, weight="dead_volume",
+                                                direction="in")
+            try:
+                fullPath = graph.findPath(start_node=closestPump,
+                                                end_node=conf["CetoniDevice"]["waste"],
+                                                via=[node],
+                                                graph=setup)
+            except NetworkXNoPath:
+                try:
+                    closestOpenEnd, pathToClosestOpenEnd = graph.findClosest(
+                                                                node=node,
+                                                                candidates=oEcands,
+                                                                graph=setup)
+                    fullPath = graph.findPath(start_node=closestPump,
+                                            end_node=closestOpenEnd,
+                                            via=[node],
+                                            graph=setup)
+                except NetworkXNoPath:
+                    fullPath = None
+            if fullPath is None:
+                nodesNotCleaned.append(node)
+            else:
+                nodePumpPath[node] = {"pump": closestPump, "path": fullPath}
+
+    if medium != "pressurizedGas":
+        pending = list(nodePumpPath.keys())
+        logger_CetoniDevice_action.info(f"{clean.__name__} \n Single pump cleaning. \n"
+            f"pending: {pending}")
+        while len(pending) > 0:
+            cleanInThisRound = {}
+            pendingCopy = pending.copy()
+            for n in pendingCopy:
+                # Since pending is updated in every iteration, but pendingCopy is not, it
+                # is checked to avoid to cover the same nodes several times
+                if n not in pending:
+                    continue
+                # There is no point in searching for pumps, if all pumps are already busy
+                # for this round
+                if all(
+                        [pump in list(cleanInThisRound.keys()) for pump in pumps]
+                    ) and (
+                        list(cleanInThisRound.keys()) != []
+                    ):
+                    break
+                closestPump = nodePumpPath[n]['pump']
+                if closestPump in cleanInThisRound.keys():
+                    candidates = [cand for cand in pumps if
+                                (cand not in cleanInThisRound.keys())]
+                    closestPump_new, pathToClosestPump_new = graph.findClosest(node=n,
+                                            candidates=candidates,
+                                            graph=setup, weight="dead_volume",
+                                            direction="in")
+                    if not ((closestPump_new is None) or (pathToClosestPump_new is None)):
+                        if n == nodePumpPath[n]["path"][-1]:
+                            newPump = closestPump_new
+                            newPath = pathToClosestPump_new
+                        else:
+                            try:
+                                fullPath_new = graph.findPath(start_node=closestPump_new,
+                                    end_node=nodePumpPath[n]["path"][-1],
+                                    via=[n],
+                                    graph=setup)
+                                newPump = closestPump_new
+                                newPath = fullPath_new
+                            except NetworkXNoPath:
+                                continue
+                    else:
+                        continue
+                elif (closestPump not in cleanInThisRound.keys()):
+                    newPump = nodePumpPath[n]['pump']
+                    newPath = nodePumpPath[n]['path']
+
+                allPaths = [newPath] + list(cleanInThisRound.values())
+                if graph.pathsCompatible(pathsList=allPaths):
+                    nodePumpPath[n]["pump"] = newPump
+                    nodePumpPath[n]["path"] = newPath
+                    cleanInThisRound[nodePumpPath[n]["pump"]] = nodePumpPath[n]['path']
+                    # Remove all the nodes involved in the path from the list of pending
+                    # nodes
+                    for np in nodePumpPath[n]['path']:
+                        try:
+                            pending.remove(np)
+                        except ValueError:
+                            continue
+
+            print(f"\n\n clean in this round {cleanInThisRound} \n\n")
+            logger_CetoniDevice_action.info(
+                f"{clean.__name__} \n clean in this round {cleanInThisRound} \n"
+            )
+            notCleanedSP, cleanedSP = singlePumpClean(pumpsPathsDict=cleanInThisRound,
+                                                    medium=medium, pumpsDict=pumpsDict,
+                                                    valvesDict=valvesDict,
+                                                    goToRef=goToRef,
+                                                    repeats=repeats,
+                                                    flow=flow,
+                                                    setup=setup)
+            # Bookkeeping about what is already cleaned and what is not
+            currentCleaned = list(total_cleaned)
+            currentNotCleaned = list(total_notCleaned)
+            for pathClean in cleanedSP:
+                currentCleaned.extend(pathClean)
+            for pathNotClean in notCleanedSP:
+                currentNotCleaned.extend(pathNotClean)
+            total_cleaned = set(currentCleaned)
+            total_notCleaned = set(currentNotCleaned)
+
+    ### Clean the instruments
+    print("not mediumNoGas",  not mediumNoGas)
+    print(instruments)
+    if not mediumNoGas:
+        logger_CetoniDevice_action.info(f"{clean.__name__} \n "
+            f"Cleaning instruments with pressurized gas.")
+
+        for node in instruments:
+            print(node)
+            nodesToPass = [f"{node}IN", f"{node}OUT"]
+            notCleanedPG, cleanedPG = pressurizedGasClean(
+                nodesToClean=nodesToPass,
+                valvesDict=valvesDict,
+                endNodeDrying=endNode_drying,
+                repeats=repeats
+                )
+
+            currentCleaned = list(total_cleaned)
+            currentNotCleaned = list(total_notCleaned)
+            for pathClean in cleanedPG:
+                currentCleaned.extend(pathClean)
+            for pathNotClean in notCleanedPG:
+                currentNotCleaned.extend(pathNotClean)
+            total_cleaned = set(currentCleaned)
+            total_notCleaned = set(currentNotCleaned)
+    return total_notCleaned, total_cleaned

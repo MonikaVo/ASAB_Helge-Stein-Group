@@ -1,22 +1,7 @@
-## Get the configuration
-try:
-    # if there is a main file, get conf from there
-    from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
-except ImportError as ie:
-    # if the import fails, check, if it is a test, which means, that a file in a pytest folder will be main and thus it will be in the path returned in the error message of the ImportError.
-    if ('pytest' in str(ie)):
-        # the software will produce a warning, which reports the switch to the testing configuration. This warning is always shown.
-        import warnings
-        warnings.filterwarnings('always')
-        warnings.warn('Configuration from main not available, but this looks like a test. Loading test configuration instead.', category=ImportWarning)
-        # the filtering funcitons are set to default again
-        warnings.filterwarnings('default')
-        # the test configuration is imported
-        from ASAB.test.FilesForTests import config_test
-        conf = config_test.config
-    # if "pytest" is not in the error message, it is assumed, that the call did not originate from a test instance and it therefore raises the ImportError.
-    else:
-        raise ie
+from ASAB.utility.helpers import importConfig
+from pathlib import Path
+
+conf = importConfig(str(Path(__file__).stem))
 
 ## Imports from ASAB
 from QmixSDK.lib.python.qmixsdk.qmixbus import DeviceError
@@ -25,7 +10,6 @@ from ASAB.driver.CetoniDevice_driver import valveObj
 
 ## Other imports
 import serial
-import numpy as np
 from ctypes import c_longlong
 
 class emulatedPort():
@@ -91,13 +75,16 @@ class emulatedPort():
             else:
                 return '0'.encode('ascii')
 
-    def write(self, message:str) -> None:
+    def write(self, message:bytes) -> None:
         ''' This function writes a message to self.message to simulate serial communication.
         Inputs:
         message: a string containing the message to write to self.message
         
         Outputs:
         This funciton has no outputs. '''
+
+        ## Check the input types
+        typeCheck(func=emulatedPort.write, locals=locals())
 
         # If the command is to read from the port, this function does nothing.
         if 'read' in message.decode('ascii'):
@@ -114,6 +101,9 @@ class emulatedPort():
         
         Outputs:
         This funciton has no outputs. '''
+
+        ## Check the input types
+        typeCheck(func=emulatedPort.apply_settings, locals=locals())
 
         # For each key in the new settings, replace the existing ones.
         for key in settings.keys():
@@ -132,7 +122,7 @@ class emulatedPort():
 class Arduino:
     ''' This class covers basic functionalities of the serial communication with an Arduino board. '''
     
-    def __init__(self, name="", number=0, serialPort:str=conf["ArduinoDriver"]["Arduino"][0]["serialPort"], settings:dict=conf["ArduinoDriver"]["Arduino"][0]["settings"], simulated:bool=conf["ArduinoDriver"]["Arduino"][0]["simulated"]) -> None:
+    def __init__(self, name:str="", number:int=0, serialPort:str=conf["ArduinoDriver"]["Arduino"][0]["serialPort"], settings:dict=conf["ArduinoDriver"]["Arduino"][0]["settings"], simulated:bool=conf["ArduinoDriver"]["Arduino"][0]["simulated"]) -> None:
         ''' This function initializes an instance of the Arduino class to bind it to a serial port.
         Inputs:
         serialPort: a string specifying the COM port, to which the Arduino is connected
@@ -141,7 +131,10 @@ class Arduino:
         
         Outputs:
         This funciton has no outputs. '''
-        
+
+        ## Check the input types
+        typeCheck(func=Arduino.__init__, locals=locals())
+
         # If the Arduino shall be simulated, use the emulatedPort class.
         if simulated:
             self.port = emulatedPort()
@@ -191,6 +184,9 @@ class ArduinoRelay:
         
         Outputs:
         This funciton has no outputs. '''
+
+        ## Check the input types
+        typeCheck(func=ArduinoRelay.__init__, locals=locals())
         
         self.port = Arduino.port
         self.relayNo = relayNo
@@ -205,7 +201,10 @@ class ArduinoRelay:
         
         Outputs:
         actualState: an integer describing the actual state of the relay after performing the command; if no valid actualState is obtained from the serial port, 2 is returned. '''
-        
+
+        ## Check the input types
+        typeCheck(func=ArduinoRelay.setRelayState, locals=locals())
+
         # If no other relay number is given, default to the one connected to the current instance of the ArduinoRelay class.
         if relayNo==None:
             relayNo = self.relayNo
@@ -232,6 +231,9 @@ class ArduinoRelay:
         
         Outputs:
         actualState: an integer describing the actual state of the relay after performing the command; if no valid actualState is obtained from the serial port, 2 is returned. '''
+
+        ## Check the input types
+        typeCheck(func=ArduinoRelay.getRelayState, locals=locals())
         
         # If no other relay number is given, default to the one connected to the current instance of the ArduinoRelay class.
         if relayNo==None:
@@ -267,6 +269,9 @@ class ArduinoValve(valveObj):
         Outputs:
         This funciton has no outputs. '''
 
+        ## Check the input types
+        typeCheck(func=ArduinoValve.__init__, locals=locals())
+        
         self.handle = c_longlong(123456)
         self.name = name
         self.positions = positions
@@ -302,6 +307,9 @@ class ArduinoValve(valveObj):
         Outputs:
         This funciton has no outputs. '''
 
+        ## Check the input types
+        typeCheck(func=ArduinoValve.switch_valve_to_position, locals=locals())
+        
         # Set the state of the relay according to the desired position of the valve
         self.relay.setRelayState(valve_position)
         # Get the actual valve position after switsching the valve

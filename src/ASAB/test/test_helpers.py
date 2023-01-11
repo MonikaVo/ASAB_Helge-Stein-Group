@@ -1,5 +1,3 @@
-import inspect
-from json import load
 from ASAB.test.FilesForTests import config_test
 conf = config_test.config
 
@@ -19,7 +17,7 @@ from pytest import raises
 
 def test_saveToFile():
     # delete the textfile with the expected name from the target directory to avoid the tests finding this file and checking this instead of the newly created one
-    for f in glob(f"{conf['test_helpers']['savePath']}\\{conf['test_helpers']['filename']}.txt"):
+    for f in glob(str(Path(conf['test_helpers']['savePath']).joinpath(f"{conf['test_helpers']['filename']}.txt"))):
         remove(f)
 
     # generate the test dictionary to save
@@ -28,10 +26,10 @@ def test_saveToFile():
     ASAB.utility.helpers.saveToFile(folder=conf['test_helpers']['savePath'], filename=conf['test_helpers']['filename'], extension=conf['test_helpers']['extension'], data=str(testDict_save))
     
     # check, if the file is generated
-    assert Path(f"{conf['test_helpers']['savePath']}\\{conf['test_helpers']['filename']}.txt").is_file(), f'The file does not exist in the expected directory.'
+    assert Path(conf['test_helpers']['savePath']).joinpath(f"{conf['test_helpers']['filename']}.txt").is_file(), f'The file does not exist in the expected directory.'
 
     # open the generated file and load its contents
-    with open (f"{conf['test_helpers']['savePath']}\\{conf['test_helpers']['filename']}.txt", "r") as file:
+    with open (Path(conf['test_helpers']['savePath']).joinpath(f"{conf['test_helpers']['filename']}.txt"), "r") as file:
         loaded_save = file.readlines()[0]
     dict_loaded = eval(loaded_save)
     # check the evaluated content of the saved file
@@ -45,16 +43,16 @@ def test_loadVariable():
     ASAB.utility.helpers.saveToFile(folder=f"{conf['test_helpers']['savePath']}", filename=f"{conf['test_helpers']['variableFile']}", extension= conf['test_helpers']['variableExtension'], data=f"myVar = {v}")
 
     # load the variable
-    v_loaded = ASAB.utility.helpers.loadVariable(loadPath=f"{conf['test_helpers']['savePath']}\\{conf['test_helpers']['variableFile']}.{conf['test_helpers']['variableExtension']}", variable='myVar')
+    v_loaded = ASAB.utility.helpers.loadVariable(loadPath=str(Path(conf['test_helpers']['savePath']).joinpath(f"{conf['test_helpers']['variableFile']}.{conf['test_helpers']['variableExtension']}")), variable='myVar')
     print(v_loaded)
     assert v_loaded == v, f"The loaded variable is {v_loaded} instead of {v}."
 
 def test_loadTxtFile():
     # Use helper function to load and evaluate
-    withHelper = ASAB.utility.helpers.loadTxtFile(loadPath=f"{conf['test_helpers']['savePath']}\\{conf['test_helpers']['filename']}.txt")
-    
+    withHelper = ASAB.utility.helpers.loadTxtFile(loadPath=str(Path(conf['test_helpers']['savePath']).joinpath(f"{conf['test_helpers']['filename']}.txt")))
+
     # Read and evaluate for reference
-    with open (f"{conf['test_helpers']['savePath']}\\{conf['test_helpers']['filename']}.txt", "r") as file:
+    with open (Path(conf['test_helpers']['savePath']).joinpath(f"{conf['test_helpers']['filename']}.txt"), "r") as file:
         loaded_save = file.readlines()[0]
     read = eval(loaded_save)
     assert read == withHelper, f"The content of the file loaded using the helper function is {withHelper} instead of {read}."

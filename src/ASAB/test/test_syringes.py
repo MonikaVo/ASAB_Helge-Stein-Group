@@ -10,7 +10,7 @@ import numpy as np
 
 def test__init__():
     # initialise test syringe
-    syr1 = syringes.syringe(desig=conf["test_syringes"]["testInit"][0]["designation"], inner_dia_mm=conf["test_syringes"]["testInit"][0]["innerDia"], piston_stroke_mm=conf["test_syringes"]["testInit"][0]["pistonStroke"])
+    syr1 = syringes.Syringe(desig=conf["test_syringes"]["testInit"][0]["designation"], inner_dia_mm=conf["test_syringes"]["testInit"][0]["innerDia"], piston_stroke_mm=conf["test_syringes"]["testInit"][0]["pistonStroke"])
     
     # get the target attributes
     desig_target = conf["test_syringes"]["testInit"][0]["designation"]

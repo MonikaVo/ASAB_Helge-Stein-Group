@@ -1,22 +1,7 @@
-## Get the configuration
-try:
-    # if there is a main file, get conf from there
-    from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
-except ImportError as ie:
-    # if the import fails, check, if it is a test, which means, that a file in a pytest folder will be main and thus it will be in the path returned in the error message of the ImportError.
-    if ('pytest' in str(ie)):
-        # the software will produce a warning, which reports the switch to the testing configuration. This warning is always shown.
-        import warnings
-        warnings.filterwarnings('always')
-        warnings.warn('Configuration from main not available, but this looks like a test. Loading test configuration instead.', category=ImportWarning)
-        # the filtering funcitons are set to default again
-        warnings.filterwarnings('default')
-        # the test configuration is imported
-        from ASAB.test.FilesForTests import config_test
-        conf = config_test.config
-    # if "pytest" is not in the error message, it is assumed, that the call did not originate from a test instance and it therefore raises the ImportError.
-    else:
-        raise ie
+from ASAB.utility.helpers import importConfig
+from pathlib import Path
+
+conf = importConfig(str(Path(__file__).stem))
 
 ## Imports from ASAB
 from ASAB.utility.helpers import loadVariable, saveToFile, typeCheck
@@ -25,10 +10,12 @@ from ASAB.driver.CetoniDevice_driver import getValvePositionDict
 ## Other imports
 from typing import Union, Tuple, List
 import networkx as nx   # https://networkx.org/documentation/stable/tutorial.html
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from pathlib import Path
+import itertools
 
 
 def generateGraph(show:bool=False, save:bool=True, path_nodes:str=conf["graph"]["pathNodes"], path_edges:str=conf["graph"]["pathEdges"], path_tubing:str=conf["graph"]["pathTubing"], save_path:str=conf["graph"]["savePath_graph"]) -> Tuple[nx.DiGraph, dict]:
@@ -69,31 +56,33 @@ def generateGraph(show:bool=False, save:bool=True, path_nodes:str=conf["graph"][
         nodes.append((node, {"name": node,"position": tuple(pos_list)}))
     # Group information regarding edges.
     edges = []
-    # Go through all the fixed edges in edges.csv and the edges contained in tubing.csv in order to generate the required dictionary containing the edges and their
-    # properties.
-    for edge in edges_info.loc[edges_info["flexibility"] == "fixed", "edge"]:
-        appendEdge(edges, edge, edges_info, edges_info, reverse=(edges_info.loc[edges_info["edge"] == edge, "restriction"].values[0] == "undirected"))
-    for edge in tubing_config["edge"]:
-        appendEdge(edges, edge, tubing_config, edges_info, reverse=(edges_info.loc[edges_info["edge"] == edge, "restriction"].values[0] == "undirected"))
+    consistency = checkConsistency(path_nodes=path_nodes, path_edges=path_edges, path_tubing=path_tubing)
+    if consistency[0]:
+        # Go through all the fixed edges in edges.csv and the edges contained in tubing.csv in order to generate the required dictionary containing the edges and their
+        # properties.
+        for edge in edges_info.loc[edges_info["flexibility"] == "fixed", "edge"]:
+            appendEdge(edges, edge, edges_info, edges_info, reverse=(edges_info.loc[edges_info["edge"] == edge, "restriction"].values[0] == "undirected"))
+        for edge in tubing_config["edge"]:
+            appendEdge(edges, edge, tubing_config, edges_info, reverse=(edges_info.loc[edges_info["edge"] == edge, "restriction"].values[0] == "undirected"))
+    else:
+        raise ValueError("Inconsistent configuration for edges, tubings and nodes.\n"
+                         f"Additional edges in tubing not in edges are:\n{consistency[1]}\n"
+                         f"Additional nodes in tubing not in nodes are:\n{consistency[2]}")
 
     # Generate a graph named graph based on the data contained in tubing_info.
     graph = nx.DiGraph()
     graph.add_nodes_from(nodes)
     graph.add_edges_from(edges)
 
-    if show==True:
-        drawGraph(graph, positions, wlabels=True)
 
-    # If the parameter is set accordingly, save the graph and the positions to a pickle file. Else return the graph.
-    if save==True:
-        folder = '\\'.join(save_path.split('\\')[:-1])
-        filename = save_path.split('\\')[-1].split('.')[0]
+    # If the parameter is set accordingly, save the graph and the positions to a .py file. Else return the graph.
+    if save:
+        folder = str(Path(save_path).resolve().parent)
+        filename = Path(save_path).resolve().stem
         saveToFile(folder=folder, filename=filename, extension="py", data=f'graph = {str(nx.to_dict_of_dicts(graph))}')
         saveToFile(folder=folder, filename=f"{filename}_positions", extension="py", data=f'graph_positions = {str(positions)}')
-        drawGraph(graph, positions, wlabels=True, save=True)
-        return graph, positions
-    elif save==False:
-        return graph, positions
+    drawGraph(graph, positions, wlabels=True, save=save, show=show)
+    return graph, positions
 
 
 def loadGraph(path_to_graphDict:str=conf["graph"]["savePath_graph"]) -> Tuple[nx.DiGraph, dict]:
@@ -184,7 +173,7 @@ def getGraph(graph:Union[str,dict,nx.DiGraph], positions:Union[dict, str, None])
 
     return graph, positions
 
-def findClosest(node:str, candidates:list, graph:Union[str,nx.DiGraph]=conf["graph"]["savePath_graph"], valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"], weight:str="dead_volume", direction:str="out") -> Tuple[str, list]:
+def findClosest(node:str, candidates:list, graph:Union[str,nx.DiGraph]=conf["graph"]["savePath_graph"], valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"], weight:str="dead_volume", direction:str="out") -> Union[Tuple[str, list], Tuple[None, None]]:
     ''' This function finds the closest candidate to a given node regarding a specified weight for the path. The direction of the search can be either
     incoming to the node (in) or outgoing from the node (out). The default is outgoing (out). The function returns the closest node among the given candidates
     and the path from the specified node to this candidate node. candidates is of type "list".
@@ -206,10 +195,8 @@ def findClosest(node:str, candidates:list, graph:Union[str,nx.DiGraph]=conf["gra
     typeCheck(func=findClosest, locals=locals())
 
     # Get the graph object from the respective input
-
-    positionsFile = conf['graph']['savePath_graph'].split('\\')[-1].split('.')[0]
-    positionsName = '\\'.join(conf['graph']['savePath_graph'].split('\\')[:-1]+[positionsFile])
-    positionsName = f"{positionsName}_positions.py"
+    positionsFile = f"{Path(conf['graph']['savePath_graph']).resolve().stem}_positions"
+    positionsName = str(Path(conf['graph']['savePath_graph']).resolve().with_stem(positionsFile))
     graph, positions = getGraph(graph, positions = positionsName)
     # check valvePositionDict
     valvePositionDict = getValvePositionDict(valvePositionDict)
@@ -248,13 +235,89 @@ def findClosest(node:str, candidates:list, graph:Union[str,nx.DiGraph]=conf["gra
                 shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPathLength"] = np.inf
                 shortest_distances.loc[shortest_distances["candidate"]==candidate, "shortestPath"] = 'no path'
 
-    # Find the closest candidate in the dataframe
-    closest = shortest_distances.loc[shortest_distances["shortestPathLength"]==min(shortest_distances["shortestPathLength"]), "candidate"].values[0]
-    # Extract the path to the closest candidate from the dataframe
-    pathToClosest = eval(shortest_distances.loc[shortest_distances["candidate"]==closest, "shortestPath"].values[0])
-    return closest, pathToClosest
+    try:
+        # Find the closest candidate in the dataframe
+        closest = shortest_distances.loc[shortest_distances["shortestPathLength"]==min(shortest_distances["shortestPathLength"]), "candidate"].values[0]
+        # Extract the path to the closest candidate from the dataframe
+        shortestPath = shortest_distances.loc[shortest_distances["candidate"]==closest, "shortestPath"].values[0]
+        if shortestPath != "no path":
+            pathToClosest = eval(shortestPath)
+        else:
+            pathToClosest = None
+        return closest, pathToClosest
+    except IndexError:
+        return None, None
 
-def findPathAB(start_node:str, end_node:str, valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"], graph:Union[str, dict,nx.DiGraph]=conf["graph"]["savePath_graph"], weight:str="dead_volume") -> List[str]:
+def improvePath(start_node:str, end_node:str, initial_path:list, valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"], graph:Union[str, dict, nx.DiGraph]=conf["graph"]["savePath_graph"], weight:str="dead_volume"):
+    ''' This function finds valid paths from start_node to end_note starting from an initial path. It uses the function "pathIsValid" to make sure that no more than two nodes belonging to the same
+    valve are included in the path. If this condition is not met by the suggestion obtained by the Dijkstra algorithm, it removes connections in a copy of the graph until
+    it finds a valid paths or no paths. The path is searched from start_node to end_node. This function does not do a selection among the found paths.
+    
+    Inputs:
+    start_node: a string giving the name of the node to start from
+    end_node: a string giving the name of the node to end with
+    valvePositionDict: a string giving the path to a file, from where to load the valvePositionDict, or a dictionary representing the valvePositionDict
+    graph: a string giving the path to a file, from where the dictionary for the graph can be loaded, or a graph object or a dictionary representing the graph
+    weight: a metric to minimize to find the shortest connection
+    
+    Outputs:
+    candidate_graphs: a pd.DataFrame representing a summary of the search containing all the paths found and corresponding removed edges and the validity of the path''' # TODO: Add conditions for the path other than just minimal weight.
+    
+    # Get the valves for the nodes in the path
+    valveList_orig = [getValveFromName(node, valvePositionDict) for node in initial_path]
+    # Transfer the path to a pandas dataframe
+    valveList = pd.DataFrame(valveList_orig)
+    # Drop the NaN values originating from nodes not belonging to valves
+    valveList = valveList.dropna()
+    # Get number of occurences of each valve in valveList
+    occurance = valveList.value_counts()    # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.value_counts.html
+    # Transfer the initial path to a numpy array
+    path = np.array(initial_path)
+    # Generate an empty dataframe for the candidates for alternative paths
+    candidate_graphs = pd.DataFrame(columns=["removed_edge", "new_graph", "new_path", "total_weight", "validity", "valveCount", "new_path_str"])
+    # Go through all entries in the occurance
+    for occ in occurance:
+        # If the occurance exceeds 2, meaning that one valve is contained more than two times in the graph
+        if occ > 2:
+            # For every occurance above 2, get the valve
+            valves = occurance[occurance.values==occ].index
+            for valv in valves:
+                # Get the index, where the original valve list has the valve
+                idx =  np.where(np.array(valveList_orig)==valv[0])
+                # Get the node at these indices in the path
+                nodeOcc = path[idx]
+                for j in range(len(nodeOcc)-1):
+                    # For the the nodes identified in the path, copy the graph
+                    new_graph = graph.copy()
+                    # Remove one edge from the copied graph between the selected node and its subsequent node
+                    new_graph.remove_edge(nodeOcc[j], nodeOcc[j+1])
+                    # Save the start and end node of the removed edge
+                    removed_edge = (nodeOcc[j], nodeOcc[j+1])
+                    try:    # https://stackoverflow.com/questions/26059424/on-error-resume-next-in-python
+                        # Try to find an alternative path in the new graph using the Dijkstra algorithm and calculate the relevant measures
+                        new_path = nx.dijkstra_path(new_graph, start_node, end_node, weight)
+                        total_weight = getTotalQuantity(nodelist=new_path, quantity=weight)
+                        validity = pathIsValid(path=new_path, valvePositionDict=valvePositionDict)
+                        valvesNewPath = pd.DataFrame([getValveFromName(node_name=nod, valvePositionDict=valvePositionDict) for nod in new_path]).dropna()
+                        valveCount = valvesNewPath.shape[0]
+                    except (nx.NodeNotFound, nx.exception.NetworkXNoPath): #KeyError: TODO: Be more specific on the Type of error!!!
+                        # If an error occurs, assume that no path could be found and set the measures accordingly
+                        new_path = "noPath"
+                        total_weight = np.inf
+                        validity = False
+                        valveCount = np.inf
+                    # Put the relevant measures in a dataframe and name its columns according to the candidate_graphs dataframe
+                    candidate = pd.DataFrame(data=np.array([removed_edge, new_graph, new_path, total_weight, validity, valveCount, str(new_path)], dtype=object)).transpose()
+                    candidate.columns=candidate_graphs.columns
+                    if candidate.at[(0, "new_path_str")] in candidate_graphs["new_path_str"]:
+                        continue
+                    # Add the new candidate to the candidate_graphs dataframe
+                    candidate_graphs = pd.concat([candidate_graphs, candidate], axis=0, ignore_index=True)
+                    candidate_graphs.reset_index(inplace=True, drop=True)
+                    candidate_graphs.drop_duplicates(subset=["new_path_str"], inplace=True)
+    return candidate_graphs
+
+def findPathAB(start_node:str, end_node:str, valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"], graph:Union[str, dict, nx.DiGraph]=conf["graph"]["savePath_graph"], weight:str="dead_volume") -> List[str]:
     ''' This function finds a path in the graph representing the setup. It uses the function "pathIsValid" to make sure that no more than two nodes belonging to the same
     valve are included in the path. If this condition is not met by the suggestion obtained by the Dijkstra algorithm, it removes connections in a copy of the graph until
     it finds a valid path. The path is searched from start_node to end_node.
@@ -273,84 +336,62 @@ def findPathAB(start_node:str, end_node:str, valvePositionDict:Union[str,dict]=c
     typeCheck(func=findPathAB, locals=locals())
 
     # Get the graph object from the respective input
-    positionsFile = conf['graph']['savePath_graph'].split('\\')[-1].split('.')[0]
-    positionsName = '\\'.join(conf['graph']['savePath_graph'].split('\\')[:-1]+[positionsFile])
-    positionsName = f"{positionsName}_positions.py"
+    positionsFile = f"{Path(conf['graph']['savePath_graph']).resolve().stem}_positions"
+    positionsName = str(Path(conf['graph']['savePath_graph']).resolve().with_stem(positionsFile))
     graph, positions = getGraph(graph, positions=positionsName)
     # Get the valvePositionDict from the respective input
     valvePositionDict = getValvePositionDict(valvePositionDict)
     # Find the initial path using the Dijkstra-algorithm.
     initial_path = nx.dijkstra_path(graph, start_node, end_node, weight=weight)
-    # Get the valves for the nodes in the path
-    valveList_orig = [getValveFromName(node, valvePositionDict) for node in initial_path]
-    # Transfer the path to a pandas dataframe
-    valveList = pd.DataFrame(valveList_orig)
-    # Drop the NaN values originating from nodes not belonging to valves
-    valveList = valveList.dropna()
-    # Get number of occurences of each valve in valveList
-    occurance = valveList.value_counts()    # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.value_counts.html
     if pathIsValid(initial_path, valvePositionDict):
         # If the initial path is valid, return the path
         return initial_path
     else:
-        # Transfer the initial path to a numpy array
-        path = np.array(initial_path)
-        # Generate an empty dataframe for the candidates for alternative paths
-        candidate_graphs = pd.DataFrame(columns=["removed_edge", "new_graph", "new_path", "total_weight", "validity", "valveCount"])
-        # Go through all entries in the occurance
-        for occ in occurance:
-            # If the occurance exceeds 2, meaning that one valve is contained more than two times in the graph
-            if occ > 2:
-                # For every occurance above 2, get the valve
-                valves = occurance[occurance.values==occ].index
-                for valv in valves:
-                    # Get the index, where the original valve list has the valve
-                    idx =  np.where(np.array(valveList_orig)==valv[0])
-                    # Get the node at these indices in the path
-                    nodeOcc = path[idx]
-                    for j in range(len(nodeOcc)-1):
-                        # For the the nodes identified in the path, copy the graph
-                        new_graph = graph.copy()
-                        # Remove one edge from the copied graph between the selected node and its subsequent node
-                        new_graph.remove_edge(nodeOcc[j], nodeOcc[j+1])
-                        # Save the start and end node of the removed edge
-                        removed_edge = (nodeOcc[j], nodeOcc[j+1])
-                        try:    # https://stackoverflow.com/questions/26059424/on-error-resume-next-in-python
-                            # Try to find an alternative path in the new graph using the Dijkstra algorithm and calculate the relevant measures
-                            new_path = nx.dijkstra_path(new_graph, start_node, end_node, weight)
-                            total_weight = getTotalQuantity(nodelist=new_path, quantity=weight)
-                            validity = pathIsValid(path=new_path, valvePositionDict=valvePositionDict)
-                            valvesNewPath = pd.DataFrame([getValveFromName(node_name=nod, valvePositionDict=valvePositionDict) for nod in new_path]).dropna()
-                            valveCount = valvesNewPath.shape[0]
-                        except: #KeyError: TODO: Be more specific on the Type of error!!!
-                            # If an error occurs, assume that no path could be found and set the measures accordingly
-                            new_path = "noPath"
-                            total_weight = np.inf
-                            validity = False
-                            valveCount = np.inf
-                        # Put the relevant measures in a dataframe and name its columns according to the candidate_graphs dataframe
-                        candidate = pd.DataFrame(data=np.array([removed_edge, new_graph, new_path, total_weight, validity, valveCount], dtype=object)).transpose()
-                        candidate.columns=["removed_edge", "new_graph", "new_path", "total_weight", "validity", "valveCount"]
-                        # Add the new candidate to the candidate_graphs dataframe
-                        candidate_graphs = pd.concat([candidate_graphs, candidate], axis=0, ignore_index=True)
+        candidate_graphs = improvePath(
+            start_node=start_node,
+            end_node=end_node,
+            initial_path=initial_path,
+            valvePositionDict=valvePositionDict,
+            graph=graph,
+            weight=weight
+            )
         # Select the row in the dataframe, which contains a valid path.
         selection = candidate_graphs.loc[(candidate_graphs["validity"]==True)]
+        # If there are still paths between the nodes found:
+        if len(selection.index) == 0 and not all(candidate_graphs["new_path"] == "noPath"):
+            invalid_candidates = candidate_graphs.loc[candidate_graphs["new_path"] != "noPath"]
+            invalid_candidates.reset_index(inplace=True, drop=True)
+            while len(selection.index) == 0 and not all(invalid_candidates["new_path"] == "noPath"):
+                alter_cands = pd.DataFrame(columns=invalid_candidates.columns)
+                alter_cands.drop_duplicates(subset=["new_path_str"])
+                for candidate  in invalid_candidates.index:
+                    cand_initial_path = invalid_candidates.at[(candidate, "new_path")]
+                    cand_graph = invalid_candidates.at[(candidate, "new_graph")]
+                    alternative_cands = improvePath(
+                        start_node=start_node,
+                        end_node=end_node,
+                        initial_path=cand_initial_path,
+                        valvePositionDict=valvePositionDict,
+                        graph=cand_graph,
+                        weight=weight
+                    )
+                    alter_cands = pd.concat([alter_cands, alternative_cands], axis=0)
+                # Select the row in the dataframe, which contains a valid path.
+                selection = alter_cands.loc[(alter_cands["validity"]==True)]
+                invalid_candidates = alter_cands.loc[alter_cands["new_path"] != "noPath"]
+                invalid_candidates.reset_index(inplace=True, drop=True)
+            candidate_graphs = invalid_candidates
         # If the selection is not empty
         if len(selection.index) != 0:
             # Among the valid paths select the one with minimum weight and subsequently the one with minimum valveCount.
             fineSelection = selection.loc[selection["total_weight"]==np.min(selection["total_weight"])]
+            if len(fineSelection.index) != 0:
+                fineSelection = fineSelection.loc[selection["valveCount"]==np.min(selection["valveCount"])]
+                # Get the path of one of the optimum valid paths
+                selected_path = fineSelection.get("new_path").array[0]
+                return selected_path
         else:
-            raise ValueError(f"No path is found between the nodes {start_node} and {end_node}.")
-        if len(fineSelection.index) != 0:
-            fineSelection = fineSelection.loc[selection["valveCount"]==np.min(selection["valveCount"])]
-        else:
-            raise ValueError(f"No path is found between the nodes {start_node} and {end_node}.")
-        if len(fineSelection.index) != 0:
-            # Get the path of one of the optimum valid paths
-            selected_path = fineSelection.get("new_path").array[0]
-            return selected_path
-        else:
-            raise ValueError(f"No path is found between the nodes {start_node} and {end_node}.")
+            raise nx.exception.NetworkXNoPath(f"No path is found between the nodes {start_node} and {end_node}.")
 
 def findPath(start_node:str, end_node:str, via:list=[], valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"], graph:Union[str,nx.DiGraph]=conf["graph"]["savePath_graph"], weight:str="dead_volume") -> List[str]:
     ''' This function finds a path from the start node to the end node and if applicable passes the nodes given as a list in 'via' in the sequence given.
@@ -383,7 +424,6 @@ def findPath(start_node:str, end_node:str, via:list=[], valvePositionDict:Union[
         ## Find a path from each node in the list of nodes to pass to its successor and assemble the paths to the total path
         # iterate over all nodes that need to be passed
         for i in range((len(nodesToPass) - 1)):
-            print(nodesToPass[i],nodesToPass[i+1])
             # get the path from this node to its successor
             path = findPathAB(start_node=nodesToPass[i], end_node=nodesToPass[i+1], valvePositionDict=valvePositionDict, graph=graph, weight=weight)
             # add this path to the total path omitting its end node
@@ -395,7 +435,7 @@ def findPath(start_node:str, end_node:str, via:list=[], valvePositionDict:Union[
             return totalPath
         # else raise a ValueError
         else:
-            raise ValueError('No path is found, which passes all the nodes in the given order. Please check the requirements.')
+            raise nx.exception.NetworkXNoPath('No path is found, which passes all the nodes in the given order. Please check the requirements.')
 
 def checkConsistency(path_nodes:str=conf["graph"]["pathNodes"], path_edges:str=conf["graph"]["pathEdges"], path_tubing:str=conf["graph"]["pathTubing"]) -> Tuple[bool, Union[bool, list], Union[bool, list]]:
     ''' This function checks, if the setup files for the graph are consistent. It checks, whether all the edges given in
@@ -481,7 +521,7 @@ def appendEdge(edgeLst:list, edgeName:str, edgeNodes:pd.DataFrame, edgeProps:pd.
             "diameter": float(edgeProps.loc[edgeProps["edge"] == edgeName, "diameter"].values[0]), "dead_volume": float(edgeProps.loc[edgeProps["edge"] == edgeName, "dead_volume"].values[0]),
             "status": edgeProps.loc[edgeProps["edge"] == edgeName, "status"].values[0]}))
 
-def drawGraph(graph:Union[str, dict, nx.DiGraph], positions:dict, wlabels:bool=True, save:bool =True) -> None:
+def drawGraph(graph:Union[str, dict, nx.DiGraph], positions:dict, wlabels:bool=True, save:bool=True, show:bool=False) -> None:
     ''' This function draws and shows or saves a graph.
     
     Inputs:
@@ -489,7 +529,8 @@ def drawGraph(graph:Union[str, dict, nx.DiGraph], positions:dict, wlabels:bool=T
            describing the graph
     positions: a dictionary containing the names of the nodes as keys and their positions as values
     wlabels: a boolean value specifying, whether the graph shall be plotted including labels for the nodes
-    save: a boolean value specifying, whether the graph shall be saved. If this is true, the graph is saved, but now shown, otherwise it is only shown.
+    save: a boolean value specifying, whether the graph shall be saved.
+    show: a boolean value specifying, whether the graph shall be shown.
 
     Outputs:
     This function has no outputs. '''
@@ -498,19 +539,18 @@ def drawGraph(graph:Union[str, dict, nx.DiGraph], positions:dict, wlabels:bool=T
     typeCheck(func=drawGraph, locals=locals())
 
     # Get the graph object based on the input graph
-    positionsFile = conf['graph']['savePath_graph'].split('\\')[-1].split('.')[0]
-    positionsName = '\\'.join(conf['graph']['savePath_graph'].split('\\')[:-1]+[positionsFile])
-    positionsName = f"{positionsName}_positions.py"
+    positionsFile = f"{Path(conf['graph']['savePath_graph']).resolve().stem}_positions"
+    positionsName = str(Path(conf['graph']['savePath_graph']).resolve().with_stem(positionsFile))
     graph, positions = getGraph(graph, positions=positionsName)
 
     nx.draw(graph, pos=positions, with_labels=wlabels)
-    if not save:
+    if save:
+        folder = Path(conf['graph']['savePath_graph']).resolve().parent
+        plt.savefig(fname=str(folder.joinpath("graphVisualized.png")))
+    if show:
         plt.show()
-    else:
-        folder = '\\'.join(conf['graph']['savePath_graph'].split('\\')[:-1]+['\\'])
-        plt.savefig(fname=f"{folder}graphVisualized.png")
 
-def getValveFromName(node_name:str, valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"]) -> Union[str, None]:
+def getValveFromName(node_name:str, valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"]) -> Union[str, float]:
     ''' This function takes a name of a node (as a string) as an input and returns the valve it belongs to. If the node does not belong to a valve. None is returned.
     
     Inputs:
@@ -548,9 +588,8 @@ def getEdgedictFromNodelist(nodelist:list, graph:Union[str, dict, nx.DiGraph]=co
     typeCheck(func=getEdgedictFromNodelist, locals=locals())
 
     # Get the graph
-    positionsFile = conf['graph']['savePath_graph'].split('\\')[-1].split('.')[0]
-    positionsName = '\\'.join(conf['graph']['savePath_graph'].split('\\')[:-1]+[positionsFile])
-    positionsName = f"{positionsName}_positions.py"
+    positionsFile = f"{Path(conf['graph']['savePath_graph']).resolve().stem}_positions"
+    positionsName = str(Path(conf['graph']['savePath_graph']).resolve().with_stem(positionsFile))
     graph, positions = getGraph(graph, positions=positionsName)
 
     edgesDict = {}
@@ -586,7 +625,7 @@ def getTotalQuantity(nodelist:list, quantity:str) -> float:   # Corresponds to n
         quantityTotal += edgedict[edg][quantity]
     return quantityTotal
 
-def getValveSettings(nodelist:list, valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"]):
+def getValveSettings(nodelist:list, valvePositionDict:Union[str,dict]=conf["CetoniDeviceDriver"]["valvePositionDict"]) -> dict[str,int]:
     ''' This fuction returns the required settings of the valves needed to realise this path based on a list of nodes describing a path in the graph and a dict of valve
     positions, in case there are valves included in the path. Otherwise, an empty dict will be returned.
     
@@ -625,11 +664,11 @@ def getValveSettings(nodelist:list, valvePositionDict:Union[str,dict]=conf["Ceto
                     # add the position to the valve settings for the respective valve
                     valveSettings[valve] = valvePositionDict[valve][node]
                 # if the position is zero, but not for a rotary valve,
-                elif ('V' not in valve) and (pos == '0'):
+                elif ('V' not in valve) or ('ArdV' in valve) and (pos == '0'):
                     # add the position to the valve settings for the respective valve
                     valveSettings[valve] = valvePositionDict[valve][node]
                 # if the valve is a rotary valve and the position is zero, skip it
-                elif ('V' in valve) and (pos == "0"):
+                elif ('V' in valve) and ('ArdV' not in valve) and (pos == "0"):
                     pass
         # if the length of valve_pos is not two, skip this node, because it is not a valve with a position
         else:
@@ -685,9 +724,8 @@ def getSystemStatus(path:list=[], full:bool=True, graph:Union[str, dict, nx.DiGr
     typeCheck(func=getSystemStatus, locals=locals())
 
     # get the graph
-    positionsFile = conf['graph']['savePath_graph'].split('\\')[-1].split('.')[0]
-    positionsName = '\\'.join(conf['graph']['savePath_graph'].split('\\')[:-1]+[positionsFile])
-    positionsName = f"{positionsName}_positions.py"
+    positionsFile = f"{Path(conf['graph']['savePath_graph']).resolve().stem}_positions"
+    positionsName = str(Path(conf['graph']['savePath_graph']).resolve().with_stem(positionsFile))
     graph, positions = getGraph(graph, positions=positionsName)
     
     # Get the status of the full system
@@ -724,9 +762,8 @@ def updateSystemStatus(path:list, graph:Union[str, dict, nx.DiGraph]=conf["graph
     typeCheck(func=updateSystemStatus, locals=locals())
 
     # Get the graph
-    positionsFile = conf['graph']['savePath_graph'].split('\\')[-1].split('.')[0]
-    positionsName = '\\'.join(conf['graph']['savePath_graph'].split('\\')[:-1]+[positionsFile])
-    positionsName = f"{positionsName}_positions.py"
+    positionsFile = f"{Path(conf['graph']['savePath_graph']).resolve().stem}_positions"
+    positionsName = str(Path(conf['graph']['savePath_graph']).resolve().with_stem(positionsFile))
     graph, positions = getGraph(graph, positions=positionsName)
     
     # Get the edges of the relevant path
@@ -865,9 +902,8 @@ def getOpenEnds(graph:Union[str, dict, nx.DiGraph]=conf["graph"]["savePath_graph
     openEnds: a list of nodes representing open ends in the graph '''
 
     # ensure that graph is a graph
-    positionsFile = conf['graph']['savePath_graph'].split('\\')[-1].split('.')[0]
-    positionsName = '\\'.join(conf['graph']['savePath_graph'].split('\\')[:-1]+[positionsFile])
-    positionsName = f"{positionsName}_positions.py"
+    positionsFile = f"{Path(conf['graph']['savePath_graph']).resolve().stem}_positions"
+    positionsName = str(Path(conf['graph']['savePath_graph']).resolve().with_stem(positionsFile))
     graph, positions = getGraph(graph, positions=positionsName)
 
     # initialise the list to collect the open edges
@@ -912,3 +948,60 @@ def getOpenEnds(graph:Union[str, dict, nx.DiGraph]=conf["graph"]["savePath_graph
     # Get rid of duplicated entries, which fulfil several criteria
     openEnds = list(pd.Series(openEnds).unique())
     return openEnds
+
+def getDirectionality(path:list, node:str) -> str:
+    ''' This function checks the directionality of a node in a path and returns it.
+    
+    Inputs:
+    path: a list of strings specifying the path, in which the node shall be checked
+    node: a string representing the name of the string
+
+    Outputs:
+    directionality: a string specifying, whether the path is incoming ("in"), outgoing ("out") or traversing ("through") the node'''
+
+    # Check the input types
+    typeCheck(func=getDirectionality, locals=locals())
+
+    # Check the position of the node and return the respective directionality
+    if path[0] == node:
+        # The path originates from the first node, which therefore needs to be outgoing
+        return "out"
+    elif path[-1] == node:
+        # The path ends in the last node, which therefore needs to be incoming
+        return "in"
+    else:
+        # Nodes within the path need to be traversed
+        return "through"
+
+def pathsCompatible(pathsList:list)-> bool:
+    ''' This function checks, if the given paths can be set simultaneously or if
+    one of them breaks, if the other is set.
+
+    Inputs:
+    pathsList: a list of lists of node names representing the paths, which shall be
+               checked
+
+    Outputs:
+    compatible: a boolean specifying, if all the paths are mutually compatible and
+                can be set at once (True) or not (False)
+    '''
+
+    # TODO: Test this function!!!
+    pathsSetList = [set(path) for path in pathsList]
+
+    combinations = itertools.combinations(pathsSetList, 2)
+    
+    for setA, setB in list(combinations):
+        difference = setA^setB
+        try:
+            # This function raises a ValueError, if one valve is crossed several times,
+            # which is equivalent to different settings for the same valve
+            _valveSettings = getValveSettings(list(difference))
+        except ValueError:
+            # As soon as one path is not compatible with any of the others,
+            # the group of paths does not work
+            return False
+    # Compatibility is only given, if all the paths are mutually compatible
+    compatible = True
+
+    return compatible

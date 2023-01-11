@@ -42,7 +42,7 @@ def referenceObjects(obj, filename:str, result=None) -> None:
                 result[k][l] = {}
                 referenceObjects(obj={l: vars(obj[k])[l]}, result=result[k], filename=filename)
         print(k, result)
-    with open(f'FilesForTests\\{filename}_test.txt', 'w') as f:   # edited prior to publication
+    with open(str(Path(__file__).resolve().parent.joinpath("FilesForTests", f"{filename}_test.txt")), 'w') as f:
         f.write(str(result))
 
 def attributeComp(result, target):
@@ -129,7 +129,7 @@ def test_valve_open():
     actualValvePos = valve_withOpen.actual_valve_position()
 
     # check, that the valve providing an open position is open after switching
-    assert actualValvePos == 2, f"The actual valve position after switching is {actualValvePos} instead of 2."
+    assert actualValvePos == 3, f"The actual valve position after switching is {actualValvePos} instead of 2."
 
     ## Test case 2: The valve has no open position
     
@@ -174,7 +174,7 @@ def test_valve_close():
     actualValvePos = valve_withClose.actual_valve_position()
 
     # check, that the valve providing an close position is close after switching
-    assert actualValvePos == 3, f"The actual valve position after switching is {actualValvePos} instead of 3."
+    assert actualValvePos == 0, f"The actual valve position after switching is {actualValvePos} instead of 3."
 
     ## Test case 2: The valve has no close position
     
@@ -235,7 +235,7 @@ def test_getValvePositionDict():
     # create one str input, one dict input and one with neither of those types
     vPd_str = conf['CetoniDeviceDriver']['valvePositionDict']
 
-    vPd_dict = {'Av': {'Av.0': 0, 'Av.1': 1}, 'V1': {'V1.1': 0, 'V1.2': 1, 'V1.3': 2, 'V1.4': 3, 'V1.5': 4, 'V1.6': 5, 'V1.7': 6, 'V1.8': 7, 'V1.9': 8, 'V1.10': 9}, 'V2': {'V2.1': 0, 'V2.2': 1, 'V2.3': 2, 'V2.4': 3, 'V2.5': 4, 'V2.6': 5, 'V2.7': 6, 'V2.8': 7, 'V2.9': 8, 'V2.10': 9}, 'V3': {'V3.1': 0, 'V3.2': 1, 'V3.3': 2, 'V3.4': 3, 'V3.5': 4, 'V3.6': 5, 'V3.7': 6, 'V3.8': 7, 'V3.9': 8, 'V3.10': 9}, 'V4': {'V4.1': 0, 'V4.2': 1, 'V4.3': 2, 'V4.4': 3, 'V4.5': 4, 'V4.6': 5, 'V4.7': 6, 'V4.8': 7, 'V4.9': 8, 'V4.10': 9}, 'V5': {'V5.1': 0, 'V5.2': 1, 'V5.3': 2, 'V5.4': 3, 'V5.5': 4, 'V5.6': 5, 'V5.7': 6, 'V5.8': 7, 'V5.9': 8, 'V5.10': 9}, 'Bv': {'Bv.0': 0, 'Bv.1': 1}, 'Cv': {'Cv.0': 0, 'Cv.1': 1}, 'ArdV_0_1': {'ArdV_0_1.0': 0, 'ArdV_0_1.1': 1}}
+    vPd_dict = {'Av': {'Av.0': 1, 'Av.1': 2}, 'V1': {'V1.1': 0, 'V1.2': 1, 'V1.3': 2, 'V1.4': 3, 'V1.5': 4, 'V1.6': 5, 'V1.7': 6, 'V1.8': 7, 'V1.9': 8, 'V1.10': 9}, 'V2': {'V2.1': 0, 'V2.2': 1, 'V2.3': 2, 'V2.4': 3, 'V2.5': 4, 'V2.6': 5, 'V2.7': 6, 'V2.8': 7, 'V2.9': 8, 'V2.10': 9}, 'V3': {'V3.1': 0, 'V3.2': 1, 'V3.3': 2, 'V3.4': 3, 'V3.5': 4, 'V3.6': 5, 'V3.7': 6, 'V3.8': 7, 'V3.9': 8, 'V3.10': 9}, 'V4': {'V4.1': 0, 'V4.2': 1, 'V4.3': 2, 'V4.4': 3, 'V4.5': 4, 'V4.6': 5, 'V4.7': 6, 'V4.8': 7, 'V4.9': 8, 'V4.10': 9}, 'V5': {'V5.1': 0, 'V5.2': 1, 'V5.3': 2, 'V5.4': 3, 'V5.5': 4, 'V5.6': 5, 'V5.7': 6, 'V5.8': 7, 'V5.9': 8, 'V5.10': 9}, 'Bv': {'Bv.0': 0, 'Bv.1': 1}, 'Cv': {'Cv.0': 0, 'Cv.1': 1}, 'ArdV_0_1': {'ArdV_0_1.0': 0, 'ArdV_0_1.1': 1}}
 
     vPd_wrongType = 1
 
@@ -308,8 +308,11 @@ def test_prepareCetoni():
         else:
             # ensure, that the valve is of type ArduinoValve
             assert type(Valves[v]) == Arduino_driver.ArduinoValve, f"The type of the entry {v} in the valves dictionary is {type(Valves[v])} instead of CetoniDevice_driver.valveObj."
-        # ensure that the valve has the correct number of valve positions
-        assert Valves[v].actual_valve_position() == 0, f"The valve position of valve {v} is {Valves[v].actual_valve_position()} instead of 0."
+        # ensure that the valve has the correct valve position
+        if Valves[v].valveType != "pump_conti":
+            assert Valves[v].actual_valve_position() == 0, f"The valve position of valve {v} is {Valves[v].actual_valve_position()} instead of 0."
+        else:
+            assert Valves[v].actual_valve_position() == 1, f"The valve position of valve {v} is {Valves[v].actual_valve_position()} instead of 1."
 
     ### Channels
 

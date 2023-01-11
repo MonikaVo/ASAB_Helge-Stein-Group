@@ -17,9 +17,9 @@ ambient;0040-CC-3;V3.9
 V1.1;0488-CC-2;Reservoir1
 V2.1;0489-CC-3;Reservoir2
 V3.1;1234-CC-6;Reservoir3
-V1.2;0487-CC-5;Solvent1
-V2.2;0489-CC-8;Solvent2
-V3.2;0489-CC-7;Solvent3
+V1.2;0487-CC-5;Solvent
+V2.2;0489-CC-8;Solvent
+V3.2;0489-CC-7;Solvent
 M1.0;0052-YY-1;ArdV_0_1.0
 ArdV_0_1_0.0;0404-NT;V4.0
 pressurizedGas;1000-YY-1;ArdV_0_1.1

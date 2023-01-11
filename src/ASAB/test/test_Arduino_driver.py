@@ -1,5 +1,4 @@
 # Import configurations
-from ctypes import c_longlong
 from ASAB.test.FilesForTests import config_test
 conf = config_test.config
 

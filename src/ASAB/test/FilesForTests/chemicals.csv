@@ -1,5 +1,5 @@
 chemicalName;molarMass;molarMass_uncertainty;density;density_uncertainty;references
-LiPF6;151.91;0;2.83;0;"density: Aldrich- 201146; molar mass: Aldrich- 201146"
-EC;88.06;0;1.32;0;"density: Aldrich- E26258; molar mass: Aldrich- E26258"
-EMC;104.1;0;1.01;0;"density: Aldrich- 754935; molar mass: Aldrich- 754935"
-DMC;90.08;0;1.07;0;"density: Sigma-Aldrich- 517127; molar mass: Sigma-Aldrich- 517127"
+LiPF6;151.91;0.0;2.83;0.0;"density: Aldrich- 201146; molar mass: Aldrich- 201146"
+EC;88.06;0.0;1.32;0.0;"density: Aldrich- E26258; molar mass: Aldrich- E26258"
+EMC;104.1;0.0;1.01;0.0;"density: Aldrich- 754935; molar mass: Aldrich- 754935"
+DMC;90.08;0.0;1.07;0.0;"density: Sigma-Aldrich- 517127; molar mass: Sigma-Aldrich- 517127"

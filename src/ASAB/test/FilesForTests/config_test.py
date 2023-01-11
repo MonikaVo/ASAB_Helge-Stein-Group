@@ -1,15 +1,25 @@
+from pathlib import Path
+
 config = dict()
 
-#####################
-### regular config###
-#####################
+######################
+### regular config ###
+######################
 
-projectFolder = ".." # edited prior to publication
-experimentFolder = "ASAB\\test\\FilesForTests" # edited prior to publication
+projectFolder = str(Path(__file__).resolve().parents[6])
+experimentFolder = str(Path(__file__).resolve().parent)
+
+run_ID = "test_ID"
+runFolder = str(Path(experimentFolder).joinpath("Runs", run_ID))
+
 
 config['projectFolder'] = projectFolder
 
 config['experimentFolder'] = experimentFolder
+
+config['run_ID'] = run_ID
+
+config["runFolder"] = runFolder
 
 config["balanceDriver"] =   {
                                 "serialPort": "<COM port>",
@@ -22,11 +32,11 @@ config["balance"] = {
                     }
 
 config["CetoniDeviceDriver"] =  {
-                                    "availableSyringes": experimentFolder + "\\syringes_test.txt",
-                                    "configPath": projectFolder + "...\\Config_Test_sim",   # edited prior to publication
-                                    "syringeConfig": {"A0.0": "1_mL", "B0.0": "5_mL", "C0.0": "2_5_mL"},#{"A0.0": "10_mL", "B0.0": "10_mL", "C0.0": "10_mL"},
-                                    "valvePositionDict": experimentFolder + "\\valvePositionDict_test.py",
-                                    "flow": 0.03,
+                                    "availableSyringes": str(Path(experimentFolder).joinpath("syringes_test.txt")),
+                                    "configPath": str(Path(projectFolder).joinpath("...","Config_Test_sim")), # edited prior to publication
+                                    "syringeConfig": {"A0.0": "1_mL", "B0.0": "5_mL", "C0.0": "2_5_mL"},#{"A0.0": "10_mL", "B0.0": "10_mL", "C0.0": "10_mL"},#
+                                    "valvePositionDict": str(Path(experimentFolder).joinpath("valvePositionDict_test.py")),
+                                    "flow": 0.1,
                                     "simulateBalance": True
                                 }
 
@@ -34,30 +44,31 @@ config["CetoniDevice"] =    {
                                 "waste": "waste_1",
                                 "gas": "ambient",
                                 "pathsToClean": [],
-                                "measureVolumes": {"densiVisco": 3.0, "uvVis": 0.0182},
+                                "measureVolumes": {"densiVisco": 3.0, "nmr": 2.815},# "uvVis": 0.0182},
+                                "pickUpNode": "M1.0",
                             }
 
 config["densiViscoDriver"] = {
-                            "inputFolder": "FilesForTests\\densiVisco",   # edited prior to publication
-                            "outputFolder": "FilesForTests\\densiVisco"   # edited prior to publication
+                            "inputFolder": str(Path(experimentFolder).joinpath("densiVisco")),
+                            "outputFolder": str(Path(experimentFolder).joinpath("densiVisco"))
                         }
 
 
 config["densiVisco"] = {
-                            "inputFolder": "FilesForTests\\densiVisco",   # edited prior to publication
-                            "outputFolder": "FilesForTests\\densiVisco"   # edited prior to publication
+                            "inputFolder": str(Path(experimentFolder).joinpath("densiVisco")),
+                            "outputFolder": str(Path(experimentFolder).joinpath("densiVisco"))
                         }
 
 config["syringes"] =    {
-                            "savePath": experimentFolder + "\\syringes_test.py",
+                            "savePath": str(Path(experimentFolder).joinpath("syringes_test.py")),
                         }
 
 config["graph"] =   {
-                        "pathNodes": experimentFolder + "\\nodes_test.csv",
-                        "pathEdges": experimentFolder + "\\edges_test.csv",
-                        "pathTubing": experimentFolder + "\\tubing_test.csv",
-                        "savePath_graph": experimentFolder + "\\graph_test.py",
-                        "saveNameValvePositionDict": experimentFolder + "\\valvePositionDict_test.py",
+                        "pathNodes": str(Path(experimentFolder).joinpath("nodes_test.csv")),
+                        "pathEdges": str(Path(experimentFolder).joinpath("edges_test.csv")),
+                        "pathTubing": str(Path(experimentFolder).joinpath("tubing_test.csv")),
+                        "savePath_graph": str(Path(experimentFolder).joinpath("graph_test.py")),
+                        "saveNameValvePositionDict": str(Path(experimentFolder).joinpath("valvePositionDict_test.py")),
                     }
 
 config["ArduinoDriver"] =   {
@@ -80,12 +91,12 @@ config["ArduinoDriver"] =   {
                             }
 
 config["solutionHandler"] = {
-                                'stockSolutions': experimentFolder + "\\stockSolutions.csv",
-                                'chemicals': experimentFolder + "\\chemicals.csv",
+                                'stockSolutions': str(Path(experimentFolder).joinpath("stockSolutions.csv")),
+                                'chemicals': str(Path(experimentFolder).joinpath("chemicals.csv")),
                                 'units': {'molarMass': 'g/mol', 'density': 'g/cm^3', 'mass': 'g'},
-                                'chemicalsDict': experimentFolder + "\\chemicalsDict.py",
+                                'chemicalsDict': str(Path(experimentFolder).joinpath("chemicalsDict.py")),
                                 'nonChemicalCols': ['solutionName', 'reservoir', 'pump', 'references', 'massTotal', 'massTotal_uncertainty', 'density', 'density_uncertainty'],
-                                'solutionsDict': experimentFolder + "\\solutionsDict.py"
+                                'solutionsDict': str(Path(experimentFolder).joinpath("solutionsDict.py"))
                             }
 
 ############################
@@ -109,6 +120,9 @@ config['test_CetoniDevice'] =   {
                                 'inputs':    {
                                                 "fillSyringe": [{"pump": "A0.0", "volume": 0.3, "waste": "Reservoir7", "valvePos":{'V1': 5, 'V2': 4, 'V3': 3, 'V4': 9, 'V5': 7, 'V6': 8, 'V7': 5, 'V8': 3, 'V9': 9, 'V10': 1, 'Av': 3, 'Bv': 1, 'Cv': 0, 'Dv': 1, 'Ev': 0, 'Fv': 0}}],
                                                 "mix":[{"mixRatio": {"Reservoir1": 0.150, "Reservoir2": 0.400, "Reservoir3": 0.600}, "waste": "Reservoir6", "gas": "Reservoir5"}],
+                                                "pathsToClean": [['A0.0', 'V6.0', 'V6.10', 'waste_1'], ['M1.0', 'ArdV_0_1.0', 'ArdV_0_1_0.0', 'V4.0', 'V4.9', 'nmrIN', 'nmrOUT', 'V5.9', 'V5.0', 'waste_1']],
+                                                "nodesToClean": ["waste_1", "nmr", "V4.9"],
+                                                "cleaningPumps": ["A0.0", "C0.0"]
                                             },
                                 'targets':  {}
                                 }
@@ -129,21 +143,21 @@ config['test_ArduinoDriver'] =  {
                                 }
 
 config['test_densiViscoDriver'] =   {
-                                        'outputFile': 'FilesForTests\\densiVisco\\OutputTest_Density_measurement.csv',   # edited prior to publication
-                                        'rawFile': 'FilesForTests\\densiVisco\\Raw_test.json',   # edited prior to publication
-                                        'resultFile': 'FilesForTests\\densiVisco\\Result_test.json',   # edited prior to publication
-                                        'savePath': 'FilesForTests\\densiVisco'   # edited prior to publication
+                                        'outputFile': str(Path(experimentFolder).joinpath("densiVisco","OutputTest_Density_Measurement.csv")),
+                                        'rawFile': str(Path(experimentFolder).joinpath("densiVisco","Raw_test.json")),
+                                        'resultFile': str(Path(experimentFolder).joinpath("densiVisco","Result_test.json")),
+                                        'savePath': str(Path(experimentFolder).joinpath("densiVisco"))
                                     }
 
 config['test_densiVisco'] =   {
-                                        'outputFile': 'FilesForTests\\densiVisco\\OutputTest_Density_measurement.csv',   # edited prior to publication
-                                        'rawFile': 'FilesForTests\\densiVisco\\Raw_test.json',   # edited prior to publication
-                                        'resultFile': 'FilesForTests\\densiVisco\\Result_test.json',   # edited prior to publication
-                                        'savePath': 'FilesForTests\\densiVisco'   # edited prior to publication
+                                        'outputFile': str(Path(experimentFolder).joinpath("densiVisco","OutputTest_Density_Measurement.csv")),
+                                        'rawFile': str(Path(experimentFolder).joinpath("densiVisco","Raw_test.json")),
+                                        'resultFile': str(Path(experimentFolder).joinpath("densiVisco","Result_test.json")),
+                                        'savePath': str(Path(experimentFolder).joinpath("densiVisco"))
                                     }
 
 config['test_helpers'] =    {
-                                'savePath': r"FilesForTests",   # edited prior to publication
+                                'savePath': experimentFolder,
                                 'filename': "test_save",
                                 'extension': "txt",
                                 'variableFile': 'loadVariable_test',
@@ -156,7 +170,7 @@ config['test_syringes'] =   {
                             }
 
 config['test_CetoniDeviceDriver'] =    {
-                                            'valvePositionDict_target': {'Av': {'Av.0': 0, 'Av.1': 1}, 'V1': {'V1.1': 0, 'V1.2': 1, 'V1.3': 2, 'V1.4': 3, 'V1.5': 4, 'V1.6': 5, 'V1.7': 6, 'V1.8': 7, 'V1.9': 8, 'V1.10': 9}, 'V2': {'V2.1': 0, 'V2.2': 1, 'V2.3': 2, 'V2.4': 3, 'V2.5': 4, 'V2.6': 5, 'V2.7': 6, 'V2.8': 7, 'V2.9': 8, 'V2.10': 9}, 'V3': {'V3.1': 0, 'V3.2': 1, 'V3.3': 2, 'V3.4': 3, 'V3.5': 4, 'V3.6': 5, 'V3.7': 6, 'V3.8': 7, 'V3.9': 8, 'V3.10': 9}, 'V4': {'V4.1': 0, 'V4.2': 1, 'V4.3': 2, 'V4.4': 3, 'V4.5': 4, 'V4.6': 5, 'V4.7': 6, 'V4.8': 7, 'V4.9': 8, 'V4.10': 9}, 'V5': {'V5.1': 0, 'V5.2': 1, 'V5.3': 2, 'V5.4': 3, 'V5.5': 4, 'V5.6': 5, 'V5.7': 6, 'V5.8': 7, 'V5.9': 8, 'V5.10': 9}, 'Bv': {'Bv.0': 0, 'Bv.1': 1}, 'Cv': {'Cv.0': 0, 'Cv.1': 1}, 'ArdV_0_1': {'ArdV_0_1.0': 0, 'ArdV_0_1.1': 1}},
+                                            'valvePositionDict_target': {'Av': {'Av.0': 1, 'Av.1': 2}, 'V1': {'V1.1': 0, 'V1.2': 1, 'V1.3': 2, 'V1.4': 3, 'V1.5': 4, 'V1.6': 5, 'V1.7': 6, 'V1.8': 7, 'V1.9': 8, 'V1.10': 9}, 'V2': {'V2.1': 0, 'V2.2': 1, 'V2.3': 2, 'V2.4': 3, 'V2.5': 4, 'V2.6': 5, 'V2.7': 6, 'V2.8': 7, 'V2.9': 8, 'V2.10': 9}, 'V3': {'V3.1': 0, 'V3.2': 1, 'V3.3': 2, 'V3.4': 3, 'V3.5': 4, 'V3.6': 5, 'V3.7': 6, 'V3.8': 7, 'V3.9': 8, 'V3.10': 9}, 'V4': {'V4.1': 0, 'V4.2': 1, 'V4.3': 2, 'V4.4': 3, 'V4.5': 4, 'V4.6': 5, 'V4.7': 6, 'V4.8': 7, 'V4.9': 8, 'V4.10': 9}, 'V5': {'V5.1': 0, 'V5.2': 1, 'V5.3': 2, 'V5.4': 3, 'V5.5': 4, 'V5.6': 5, 'V5.7': 6, 'V5.8': 7, 'V5.9': 8, 'V5.10': 9}, 'Bv': {'Bv.0': 0, 'Bv.1': 1}, 'Cv': {'Cv.0': 0, 'Cv.1': 1}, 'ArdV_0_1': {'ArdV_0_1.0': 0, 'ArdV_0_1.1': 1}},
                                             "prepareCetoni":    {"syringeParams":
                                                                     {
                                                                         "A0.0": {"params": "syringe(inner_diameter_mm=4.60659, max_piston_stroke_mm=60.0)", "volUnit": "unit(prefix=<UnitPrefix.milli: -3>, unitid=<VolumeUnit.litres: 68>)", "flowUnit": "unit(prefix=<UnitPrefix.milli: -3>, unitid=<VolumeUnit.litres: 68>, time_unitid=<TimeUnit.per_second: 1>)"},
@@ -168,11 +182,11 @@ config['test_CetoniDeviceDriver'] =    {
                                         }
 
 config['test_graph'] =  {
-                            'graph_target': r'FilesForTests\graph_target.py',   # edited prior to publication
-                            'positions':experimentFolder + "\\graph_test_positions.py",
+                            'graph_target': str(Path(experimentFolder).joinpath("graph_target.py")),
+                            'positions': str(Path(experimentFolder).joinpath("graph_test_positions.py")),
                             'findClosest': {'node': 'densiViscoIN', 'candidates': ['A0.0', 'B0.0', 'C0.0'], 'closest_target': 'A0.0', 'pathToClosest_target': ['A0.0', 'A0.1', 'Av.1', 'M1.1', 'M1.0', 'ArdV_0_1.0', 'ArdV_0_1_0.0', 'V4.0', 'V4.8', 'densiViscoIN']},
                             'findPath': {'start_node': 'A0.0', 'end_node': 'waste_1', 'path_direct_target': ['A0.0', 'A0.1', 'Av.0', 'V1.0', 'V1.10', 'waste_1'], 'via': ['densiViscoIN', 'V5.0'], 'path_via_target': ['A0.0', 'A0.1', 'Av.1', 'M1.1', 'M1.0', 'ArdV_0_1.0', 'ArdV_0_1_0.0', 'V4.0', 'V4.8', 'densiViscoIN', 'densiViscoOUT', 'V5.8', 'V5.0', 'waste_1']},
-                            'checkConsistency': {"path_nodes": experimentFolder + "\\nodes_test.csv", "path_edges": experimentFolder + "\\edges_test.csv", "path_tubing_match": experimentFolder + "\\tubing_test.csv", "path_tubing_newNode": experimentFolder + "\\tubing_test_newNode.csv", "path_tubing_newEdge": experimentFolder + "\\tubing_test_newEdge.csv", "path_tubing_newEdgeAndNode": experimentFolder + "\\tubing_test_newEdgeAndNode.csv"},
+                            'checkConsistency': {"path_nodes": str(Path(experimentFolder).joinpath("nodes_test.csv")), "path_edges": str(Path(experimentFolder).joinpath("edges_test.csv")), "path_tubing_match": str(Path(experimentFolder).joinpath("tubing_test.csv")), "path_tubing_newNode": str(Path(experimentFolder).joinpath("tubing_test_newNode.csv")), "path_tubing_newEdge": str(Path(experimentFolder).joinpath("tubing_test_newEdge.csv")), "path_tubing_newEdgeAndNode": str(Path(experimentFolder).joinpath("tubing_test_newEdgeAndNode.csv"))},
                             'appendEdge': {'edgeName': "0488-CC-2"},
                             'valveNames': ["V1.0", "V5.3", "V3.4", "V4.2", "V2.9", "V3.1", "V5.6", "V4.8", "V2.10"],
                             'valves': ["V1", "V5", "V3", "V4", "V2", "V3", "V5", "V4", "V2"],
@@ -192,26 +206,25 @@ config['test_graph'] =  {
                                                 '0488-CC-3': {'name': '0488-CC-3', 'designation': ('V5.0', 'waste_1'), 'ends': 'CC', 'length': 488.0, 'diameter': 1.6, 'dead_volume': 0.9812, 'status': 'empty'}},
                             'quantity': 'dead_volume',
                             'totalQuantity_target': 17.4369,
-                            'valveSettings_target': {'Av': 1, 'V4': 8, 'V5': 8},
+                            'valveSettings_target': {'Av': 2, 'ArdV_0_1': 0, 'V4': 8, 'V5': 8},
                             'nodelist_noValve': ['M1.1', 'M1.0', 'V4.0'],
                             'nodelist_wrongPath': ['nmrIN', 'nmrOUT', 'V5.9', 'V5.0', 'V5.8', 'densiViscoIN'],
-                            'openEnds': ['ambient', 'waste_1', 'waste_2',
+                            'openEnds': ['ambient', 'waste_1',
                                         'A0.0', 'B0.0', 'C0.0',
                                         'V1.3', 'V1.4', 'V1.5', 'V1.6', 'V1.7', 'V1.8',
                                         'V2.3', 'V2.4', 'V2.5', 'V2.6', 'V2.7', 'V2.8',
                                         'V3.3', 'V3.4', 'V3.5', 'V3.6', 'V3.7', 'V3.8',
                                         'V4.1', 'V4.2', 'V4.3', 'V4.4', 'V4.5', 'V4.6', 'V4.7', 'V4.10',
                                         'V5.1', 'V5.2', 'V5.3', 'V5.4', 'V5.5', 'V5.6', 'V5.7',
-                                        'Reservoir1', 'Reservoir2', 'Reservoir3',
-                                        'Solvent1', 'Solvent2', 'Solvent3'],
+                                        'Reservoir1', 'Reservoir2', 'Reservoir3'],
                         }
 
 config['test_solutionHandler'] =    {
                                         'chemical_test': {'name': 'LiPF6', 'molarMass': 151.91, 'molarMassUncertainty': 0.0, 'density': 2.83, 'densityUncertainty': 0.0},
-                                        'chemicalsDict_target': {'LiPF6': {'name': 'LiPF6', 'molarMass': 151.91, 'molarMassUncertainty': 0, 'molarMassUnit': 'g/mol', 'density': 2.83, 'densityUncertainty': 0, 'densityUnit': 'g/cm^3'}, 'EC': {'name': 'EC', 'molarMass': 88.06, 'molarMassUncertainty': 0, 'molarMassUnit': 'g/mol', 'density': 1.320, 'densityUncertainty': 0, 'densityUnit': 'g/cm^3'}, 'EMC': {'name': 'EMC', 'molarMass': 104.1, 'molarMassUncertainty': 0, 'molarMassUnit': 'g/mol', 'density': 1.010, 'densityUncertainty': 0, 'densityUnit': 'g/cm^3'}, 'DMC': {'name': 'DMC', 'molarMass': 90.08, 'molarMassUncertainty': 0, 'molarMassUnit': 'g/mol', 'density': 1.070, 'densityUncertainty': 0, 'densityUnit': 'g/cm^3'}},
+                                        'chemicalsDict_target': {'LiPF6': {'name': 'LiPF6', 'molarMass': 151.91, 'molarMassUncertainty': 0.0, 'molarMassUnit': 'g/mol', 'density': 2.83, 'densityUncertainty': 0.0, 'densityUnit': 'g/cm^3'}, 'EC': {'name': 'EC', 'molarMass': 88.06, 'molarMassUncertainty': 0.0, 'molarMassUnit': 'g/mol', 'density': 1.320, 'densityUncertainty': 0.0, 'densityUnit': 'g/cm^3'}, 'EMC': {'name': 'EMC', 'molarMass': 104.1, 'molarMassUncertainty': 0.0, 'molarMassUnit': 'g/mol', 'density': 1.010, 'densityUncertainty': 0.0, 'densityUnit': 'g/cm^3'}, 'DMC': {'name': 'DMC', 'molarMass': 90.08, 'molarMassUncertainty': 0.0, 'molarMassUnit': 'g/mol', 'density': 1.070, 'densityUncertainty': 0.0, 'densityUnit': 'g/cm^3'}},
                                         'solution_test': {'name': '1M_LiPF6_EC-EMC', 'chemicalMasses': {'LiPF6': 30.38, 'EC': 63.086, 'EMC': 146.734, 'DMC': 0.0}, 'chemicalMassesUncertainties': {'LiPF6': 0.001, 'EC': 0.001, 'EMC': 0.001, 'DMC': 0.0}, 'chemicals': ['LiPF6', 'EC', 'EMC', 'DMC'], 'mass': 240.203, 'massUncertainty': 0.001, 'massUnit': 'g', 'density': 1.2, 'densityUncertainty': 0.01, 'densityUnit': 'g/cm^3', 'reservoir': 'Reservoir1', 'pump': 'A0.0', 'substanceAmountPerVolume': {'LiPF6': 0.0009990891086778535, 'EC': 0.0035789623469260124, 'EMC': 0.007041786377590972, 'DMC': 0.0}},
                                         'substanceAmountPerVolume_target': {'LiPF6': 0.0009990891086778535, 'EC': 0.0035789623469260124, 'EMC': 0.007041786377590972, 'DMC': 0.0},
-                                        'parameterDict': {'chemicalsDict': 'FilesForTests\\chemicalsDict.py'},  # edited prior to publication
+                                        'parameterDict': {'chemicalsDict': str(Path(experimentFolder).joinpath("chemicalsDict.py"))},
                                         'density': 1.57,
                                         'density_std': 0.03,
                                         'solutionsDict_target': {'1M_LiPF6_EC-EMC': {'name': '1M_LiPF6_EC-EMC', 'chemicalMasses': {'LiPF6': 30.38, 'EC': 63.086, 'EMC': 146.734, 'DMC': 0.0}, 'chemicalMassesUncertainties': {'LiPF6': 0.001, 'EC': 0.001, 'EMC': 0.001, 'DMC': 0.0}, 'chemicals': ['LiPF6', 'EC', 'EMC', 'DMC'], 'mass': 240.203, 'massUncertainty': 0.001, 'massUnit': 'g', 'density': 1.2, 'densityUncertainty': 0.01, 'densityUnit': 'g/cm^3', 'reservoir': 'Reservoir1', 'pump': 'A0.0', 'substanceAmountPerVolume': {'LiPF6': 0.0009990891086778535, 'EC': 0.0035789623469260124, 'EMC': 0.007041786377590972, 'DMC': 0.0}}, '1M_LiPF6_DMC': {'name': '1M_LiPF6_DMC', 'chemicalMasses': {'LiPF6': 30.38, 'EC': 0.0, 'EMC':0.0, 'DMC': 205.62}, 'chemicalMassesUncertainties': {'LiPF6': 0.001, 'EC': 0, 'EMC': 0, 'DMC': 0.001}, 'chemicals': ['LiPF6', 'EC', 'EMC', 'DMC'], 'mass': 236.003, 'massUncertainty': 0.001, 'massUnit': 'g', 'density': 1.18, 'densityUncertainty': 0.01, 'densityUnit': 'g/cm^3', 'reservoir': 'Reservoir2', 'pump': 'B0.0', 'substanceAmountPerVolume': {'LiPF6': 0.0009999214606829178, 'EC': 0.0, 'EMC': 0.0, 'DMC': 0.011413043196029458}}, '1M_LiPF6_EC-DMC': {'name': '1M_LiPF6_EC-DMC', 'chemicalMasses': {'LiPF6': 30.38, 'EC': 114.81, 'EMC': 0.0, 'DMC': 114.81}, 'chemicalMassesUncertainties': {'LiPF6': 0.001, 'EC': 0.001, 'EMC': 0.0, 'DMC': 0.001}, 'chemicals': ['LiPF6', 'EC', 'EMC', 'DMC'], 'mass': 260.003, 'massUncertainty': 0.001, 'massUnit': 'g', 'density': 1.3, 'densityUncertainty': 0.01, 'densityUnit': 'g/cm^3', 'reservoir': 'Reservoir3', 'pump': 'C0.0', 'substanceAmountPerVolume': {'LiPF6': 0.0009999226339800899, 'EC': 0.006518775566915509, 'EMC': 0.0, 'DMC': 0.006372595208954038}}},

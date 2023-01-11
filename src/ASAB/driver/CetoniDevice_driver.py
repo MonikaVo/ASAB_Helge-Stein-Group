@@ -1,32 +1,15 @@
-## Get the configuration
-try:
-    # if there is a main file, get conf from there
-    from __main__ import conf   # https://stackoverflow.com/questions/6011371/python-how-can-i-use-variable-from-main-file-in-module
-except ImportError as ie:
-    # if the import fails, check, if it is a test, which means, that a file in a pytest folder will be main and thus it will be in the path returned in the error message of the ImportError.
-    if ('pytest' in str(ie)):
-        # the software will produce a warning, which reports the switch to the testing configuration. This warning is always shown.
-        import warnings
-        warnings.filterwarnings('always')
-        warnings.warn('Configuration from main not available, but this looks like a test. Loading test configuration instead.', category=ImportWarning)
-        # the filtering funcitons are set to default again
-        warnings.filterwarnings('default')
-        # the test configuration is imported
-        from ASAB.test.FilesForTests import config_test
-        conf = config_test.config
-    # if "pytest" is not in the error message, it is assumed, that the call did not originate from a test instance and it therefore raises the ImportError.
-    else:
-        raise ie
+from ASAB.utility.helpers import importConfig
+from pathlib import Path
 
-from genericpath import isfile
+conf = importConfig(str(Path(__file__).stem))
+
 from ASAB.configuration import config
 cf = config.configASAB
 
 ## Imports from ASAB
-from ASAB.utility.syringes import loadSyringeDict, syringe
+from ASAB.utility.syringes import loadSyringeDict, Syringe
 from ASAB.utility.helpers import loadVariable, saveToFile, typeCheck
-# import ASAB.driver.Arduino_driver as AD   # Import this below to avoid / hack cyclic import
-
+from ASAB.utility import loggingASAB
 
 # Imports from QmixSDK
 import sys
@@ -39,7 +22,10 @@ from qmixsdk import qmixcontroller
 # Other imports
 import string # https://www.delftstack.com/howto/python/python-alphabet-list/
 from typing import Union, List
-from pathlib import Path
+import logging
+
+# create a logger for this module
+logger_CetoniDevice_driver = logging.getLogger(f"run_logger.{__name__}")
 
 class valveObj(qmixvalve.Valve):
     ''' This class provides the functionalities of a valve as provided in the qmixsdk, but allows an extensioin e.g. adding
@@ -77,19 +63,19 @@ class valveObj(qmixvalve.Valve):
 
         # check, if the type of the valve corresponds to the one related to the nemesys_S contiflow valves, is a sufficient number of
         # valve positions is available and the valve is not a QmixV valve
-        if (self.type == 'pumpValve_conti') and (self.number_of_valve_positions() > 2) and ('QmixV' not in self.get_device_name()):
-            # try to switch the valve to position 2
+        if (self.type == 'pumpValve_conti') and (self.number_of_valve_positions() > 3) and ('QmixV' not in self.get_device_name()):
+            # try to switch the valve to position 3
             try:
-                self.switch_valve_to_position(2)
+                self.switch_valve_to_position(3)
             except: # -> This part is not yet tested.
-                # If the valve does not have a position 2, raise an error
+                # If the valve does not have a position 3, raise an error
                 raise AttributeError(f"The valve {self.name} does not offer an 'open' position. Maybe it's type is wrong.")
         else:
             # If the valve is of the wrong type, raise an error
             raise AttributeError(f"The valve {self.name} does not offer an 'open' position as it is a {self.type}.")
 
     def close(self) -> None:
-        ''' This function puts a valve corresponding to a pump module to the "open" position. This position is available for nemesys_S
+        ''' This function puts a valve corresponding to a pump module to the "close" position. This position is available for nemesys_S
         contiflow valves. If the valve does not offer the respective position, a message is printed. A message is also printed, if the
         valve does not correspond to a pump module.
         
@@ -102,12 +88,7 @@ class valveObj(qmixvalve.Valve):
         # check, if the type of the valve corresponds to the one related to the nemesys_S contiflow valves, is a sufficient number of
         # valve positions is available and the valve is not a QmixV valve
         if (self.type == 'pumpValve_conti') and (self.number_of_valve_positions() > 3) and ('QmixV' not in self.get_device_name()):
-            # try to switch the valve to position 3
-            try:
-                self.switch_valve_to_position(3)
-            except: # -> This part is not yet tested.
-                # If the valve does not have a position 2, raise an error
-                raise AttributeError(f"The valve {self.name} does not offer an 'open' position. Maybe it's type is wrong.")
+            self.switch_valve_to_position(0)
         else:
             # If the valve is of the wrong type, raise an error
             raise AttributeError(f"The valve {self.name} does not offer an 'open' position as it is a {self.type}.")
@@ -136,7 +117,7 @@ class pumpObj(qmixpump.Pump):
         self.status = "empty"
         # This attribute holds an object of the type "syringe", which contains the information regarding the syringe mounted
         # on the pump module corresponding to the pump object
-        self.syringe = syringe(desig="init", inner_dia_mm=0.0, piston_stroke_mm=0.0)
+        self.syringe = Syringe(desig="init", inner_dia_mm=0.0, piston_stroke_mm=0.0)
         self.pumpType = pumpType
 
 def loadValvePositionDict(path_to_ValvePositionDict:str) -> dict:
@@ -230,6 +211,9 @@ class cetoni:
 
         # Open bus library
         qmixbus.Bus.open(config_path, QmixSDK_path)
+        logger_CetoniDevice_driver.info(f"{cetoni.prepareCetoni.__name__}\nBus communication opened with \n"
+                                        f"Cetoni configuration path: {config_path}\n"
+                                        f"QmixSDK path: {QmixSDK_path}")
 
         # Get info about the numbers of accessible elements and retrieve handles and print overview
         print("\n\n--------------Detected Setup--------------\n\n")
@@ -238,7 +222,8 @@ class cetoni:
 
         # Get number of pump modules
         noOfPumps = qmixpump.Pump.get_no_of_pumps()
-        print("\n The number of pumps is {} with the names and lables:\n".format(noOfPumps))
+        print("\n The number of pumps is {} with the names, lables, and types:\n".format(noOfPumps))
+        logmsg = [f"The number of pumps is {noOfPumps} with the names, lables, and types:"]
         # Retrieve device handles for pump modules and save pumps in Pumps
         Pumps = {}
         for p in range(noOfPumps):
@@ -257,6 +242,7 @@ class cetoni:
             # Add the pump to the dictionary of pumps
             Pumps[Pump_designation] = Pump
             print(Pump.get_device_name(), Pump.name, Pump.pumpType)
+            logmsg.append(f"Device name:\t{Pump.get_device_name()}, pump name:\t{Pump.name}, pump type:\t{Pump.pumpType}")
 
         ## Valves
 
@@ -264,7 +250,8 @@ class cetoni:
         valvePositionDict = {}
         # Get number of valves (QmixV elements PLUS valves for syringe pumps)
         noOfValves = qmixvalve.Valve.get_no_of_valves()
-        print("\n The number of valves is {} with the names and labels:\n".format(noOfValves))
+        print("\n The number of valves is {} with the names, labels, types and number of valve positions:\n".format(noOfValves))
+        logmsg.append(f"\nThe number of valves is {noOfValves} with the names, labels, types and number of valve positions:")
         # Retrieve device handles for valves and save valves in Valves
         Valves = {}
         for v in range(noOfValves):
@@ -297,7 +284,7 @@ class cetoni:
                 # Get the type of nemesys valve it is
                 if (Valve.get_device_name().lower().__contains__('_low_pressure')):
                     Valve.valveType = 'pump'
-                elif (Valve.get_device_name().lower().__contains__('_S')):
+                elif (Valve.get_device_name().lower().__contains__('_s')):
                     Valve.valveType = 'pump_conti'
                 # Go through the pumps
                 for p in Pumps.keys():
@@ -316,34 +303,20 @@ class cetoni:
                         for z in [0,1]:
                             # Assemble the key for the respective port of the valve
                             key2 = f"{Valve_designation}.{z}"
-                            # Generate an entry for the port of the valve, which is 1 for designation 1 and 0 for deignation 0.
-                            valvePositionDict[Valve_designation][key2] = z
+                            if Valve.valveType=="pump":
+                                # Generate an entry for the port of the valve, which is 1 for designation 1 and 0 for deignation 0.
+                                valvePositionDict[Valve_designation][key2] = z
+                            elif Valve.valveType=='pump_conti':
+                                # Generate an entry for the port of the valve, which is 1 for designation 1 and 0 for deignation 0.
+                                valvePositionDict[Valve_designation][key2] = z+1
                 Valves[Valve_designation] = Valve
             else:
                 # Print an info, if the valve is neither a QmixV valve nor a pump valve
                 raise ValueError("An error occured. Unknown Type of valve.")
             print(Valve.get_device_name(), Valve.name, Valve.valveType, Valve.number_of_valve_positions())
-
-        ## Channels
-
-        # Get number of control channels
-        noOfControllerChannels = qmixcontroller.ControllerChannel.get_no_of_channels()
-        print("\n The number of control channels is {} with the names and labels:\n".format(noOfControllerChannels))
-        # Retrieve device handles for valves and save valves in Valves
-        Channels = {}
-        for c in range(noOfControllerChannels):
-            # Initialise controller channel
-            Channel = qmixcontroller.ControllerChannel()
-            # Get a handle
-            Channel.lookup_channel_by_index(c)
-            # Assign a shorter name
-            Channel_designation = Channel.get_name().replace("QmixQminus_", "QQ-_")
-            Channel_designation = Channel_designation. replace("QmixQplus_Column", "QQ+_col")
-            Channel_designation = Channel_designation.replace("Temperature", "temp")
-            Channel_designation = Channel_designation.replace("ReactionLoop", "loop")
-            Channel_designation = Channel_designation.replace("ReactorZone", "zone")
-            Channels[Channel_designation] = Channel
-            print(Channel.get_name(), Channel_designation)
+            logmsg.append(f"Device name:\t{Valve.get_device_name()}, "
+                          f"valve name:\t{Valve.name}, valve type:\t{Valve.valveType},"
+                          f"number of valve positions:\t{Valve.number_of_valve_positions()}")
 
         ## Arduino Valves
 
@@ -387,12 +360,42 @@ class cetoni:
                         valvePositionDict[ArduinoValve_designation][key3] = i
 
                     print(Valve.get_device_name(), Valve.name, Valve.valveType, Valve.number_of_valve_positions())
+                    logmsg.append(f"Device name:\t{Valve.get_device_name()}, "
+                                  f"valve name:\t{Valve.name}, valve type:\t{Valve.valveType},"
+                                  f"number of valve positions:\t{Valve.number_of_valve_positions()}")
+
+        ## Channels
+
+        # Get number of control channels
+        noOfControllerChannels = qmixcontroller.ControllerChannel.get_no_of_channels()
+        print("\n The number of control channels is {} with the names and labels:\n".format(noOfControllerChannels))
+        logmsg.append(f"\nThe number of control channels is {noOfControllerChannels} with the names and labels:")
+        # Retrieve device handles for valves and save valves in Valves
+        Channels = {}
+        for c in range(noOfControllerChannels):
+            # Initialise controller channel
+            Channel = qmixcontroller.ControllerChannel()
+            # Get a handle
+            Channel.lookup_channel_by_index(c)
+            # Assign a shorter name
+            Channel_designation = Channel.get_name().replace("QmixQminus_", "QQ-_")
+            Channel_designation = Channel_designation. replace("QmixQplus_Column", "QQ+_col")
+            Channel_designation = Channel_designation.replace("Temperature", "temp")
+            Channel_designation = Channel_designation.replace("ReactionLoop", "loop")
+            Channel_designation = Channel_designation.replace("ReactorZone", "zone")
+            Channels[Channel_designation] = Channel
+            print(Channel.get_name(), Channel_designation)
+            logmsg.append(f"Channel name:\t{Channel.get_name()}, channel label:\t{Channel_designation}")
+        logmsg = "\n".join(logmsg)
+        logger_CetoniDevice_driver.info(msg=f"{cetoni.prepareCetoni.__name__}\n{logmsg}")
 
         print("\n\n--------------Detected Setup--------------\n\n")
             
         # Setting devices operational
 
         qmixbus.Bus.start()
+        logger_CetoniDevice_driver.info(f"{cetoni.prepareCetoni.__name__}\nBus communication started.")
+
 
         # Configuring syringes
         for pump in Pumps.keys():
@@ -412,14 +415,18 @@ class cetoni:
             else:
                 # If none of the above two cases apply, print a message
                 raise ValueError("There is an error. Pump {} is enabled: {}, is in fault state {}.".format(pump, Pumps[pump].is_enabled(), Pumps[pump].is_in_fault_state()))
-            #print(Pumps[pump].get_syringe_param(), Pumps[pump].get_flow_rate_max(), Pumps[pump].get_volume_max())        
 
         # Initialise the valve positions to 0
         for valve in Valves.keys():
-            Valves[valve].switch_valve_to_position(0)
+            v = Valves[valve]
+            if not (v.valveType == 'pump_conti'):
+                Valves[valve].switch_valve_to_position(0)
+            else:
+                Valves[valve].switch_valve_to_position(1)
         '''----------------Preparation end----------------'''
         # Save the valvePositionDict to the path specified by save_name.
-        saveToFile(folder='\\'.join(save_name_vPd.split('\\')[:-1]), filename=save_name_vPd.split('\\')[-1].split('.')[0], extension='py', data=f"vPd = {str(valvePositionDict)}")
+        saveToFile(folder='\\'.join(save_name_vPd.split('\\')[:-1]), filename=save_name_vPd.split('\\')[-1].split('.')[0], extension=save_name_vPd.split('\\')[-1].split('.')[1], data=f"vPd = {str(valvePositionDict)}")
+        logger_CetoniDevice_driver.info(f"{cetoni.prepareCetoni.__name__}\nvalvePositionDict saved to {save_name_vPd}")
         return Pumps, Valves, Channels
 
     def quitCetoni() -> None:
@@ -436,6 +443,8 @@ class cetoni:
         qmixbus.Bus.stop()
         # Close bus library
         qmixbus.Bus.close()
+        print("Communication with Cetoni device ended.")
+        logger_CetoniDevice_driver.info(f"{cetoni.quitCetoni.__name__}\nCommunication with Cetoni device ended.")
         '''----------------Finishing end----------------'''
 
     def getValvePositions(valvesDict:dict, valvePositionDict:Union[str, dict]=conf["CetoniDeviceDriver"]["valvePositionDict"]) -> dict:
@@ -460,7 +469,7 @@ class cetoni:
             valvePos[valve] = valvesDict[valve].actual_valve_position()
         return valvePos
 
-    def pumpingPumps(pumpsDict:dict) -> List[pumpObj]:
+    def pumpingPumps(pumpsDict:dict) -> List[str]:
         ''' This function returns a list of pumps, which are currently pumping.
         Inputs:
         pumpsDict: a dictionary containing the names of the pumps as keys and the pump objects present in the setup as values

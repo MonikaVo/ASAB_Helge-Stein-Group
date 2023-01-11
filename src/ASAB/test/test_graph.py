@@ -186,6 +186,9 @@ def test_findPathAB():
 
     assert pathAB_target == pathAB_result, f"The found path is {pathAB_result} instead of {pathAB_target}."
 
+    with raises(nx.exception.NetworkXNoPath):
+        graph.findPathAB(start_node="B0.0", end_node="Reservoir1")
+
 def test_findPath():
     ## No additional nodes
 
@@ -328,14 +331,14 @@ def test_appendEdge():
 
 def test_drawGraph():
     # Get the folder where to save the images and the filename for the test and target graphs
-    folder = '\\'.join(conf['graph']['savePath_graph'].split('\\')[:-1]+['\\'])
-    filename_test = f"{folder}graph_test.png"
-    filename_target = f"{folder}graph_target.png"
+    folder = Path(conf['graph']['savePath_graph']).resolve().parent
+    filename_test = folder.joinpath("graph_test.png")
+    filename_target = folder.joinpath("graph_target.png")
 
     # Delete the graph image files, if they are already in the target directory to avoid them being checked instead of the newly created ones
-    if Path(filename_test).is_file():
+    if filename_test.is_file():
         remove(filename_test)
-    if Path(filename_target).is_file():
+    if filename_target.is_file():
         remove(filename_target)
 
     # Generate test graph and the respective positions.
@@ -349,7 +352,7 @@ def test_drawGraph():
     savefig(fname=filename_target)
 
     # compare the saved graphs
-    x = compare.compare_images(f"{folder}graph_target.png", f"{folder}graph_test.png", tol=0)
+    x = compare.compare_images(filename_target, filename_test, tol=0)
     assert x == None, f'The result of the image comparison is {x} instead of None.'
 
 def test_getValveFromName():
@@ -505,3 +508,28 @@ def test_getOpenEnds():
 
     for oe in openEnds_target:
         assert oe in openEnds_result, f"The open ends {openEnds_result} do not contain the entry {oe}."
+
+def test_getDirectionality():
+    # Get the graph
+    graph_path = conf['test_graph']['graph_target']
+
+    # Get the test path
+    path_test = conf['test_graph']['nodelist']
+
+    ## Test case outgoing
+    node = "A0.0"
+    directionality = graph.getDirectionality(path=path_test, node=node)
+
+    assert directionality == "out", f"The directionality is {directionality} instead of out."
+
+    ## Test case incoming
+    node = "waste_1"
+    directionality = graph.getDirectionality(path=path_test, node=node)
+
+    assert directionality == "in", f"The directionality is {directionality} instead of in."
+
+    ## Test case traversing
+    node = "M1.0"
+    directionality = graph.getDirectionality(path=path_test, node=node)
+
+    assert directionality == "through", f"The directionality is {directionality} instead of through."
