@@ -158,8 +158,6 @@ class PalmsensDevice():
         if method == "EIS":
             method_instance = ImpedimetricMethod()
             method_params = {}
-            print(parameters["maxCurrent"], type(parameters["maxCurrent"]))
-            print(parameters["minCurrent"], type(parameters["minCurrent"]))
             method_params["Ranging.MaximumCurrentRange"] = CurrentRange(CurrentRanges(parameters["maxCurrent"]))
             method_params["Ranging.MinimumCurrentRange"] = CurrentRange(CurrentRanges(parameters["minCurrent"]))
             for k in parameters.keys():
