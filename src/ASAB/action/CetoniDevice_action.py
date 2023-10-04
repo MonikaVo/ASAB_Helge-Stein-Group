@@ -573,7 +573,7 @@ def fillSyringe(pump:pumpObj, volume:float, valvesDict:dict, reservoir:str, tole
         if pump.get_fill_level() <= limit_level:
             # Print a message, if the lower limit was hit
             raise ValueError(
-                f"The syringe of pump {pump} seems to be empty. "
+                f"The syringe of pump {pump.name} seems to be empty. "
                 "Please check the cause for that. "
                 f"Likely reservoir {reservoir} is empty.")
         # Get the current fill level of the pump
