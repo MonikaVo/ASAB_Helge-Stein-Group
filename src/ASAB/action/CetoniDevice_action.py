@@ -413,7 +413,7 @@ def provideSample(
         switchValves(nodelist=path, valvesDict=valves)
         for i in range(3):
             switchValves(nodelist=pathPGtoSampleNode, valvesDict=valves)
-            time.sleep(1.)
+            time.sleep(2.)
             switchValves(nodelist=pathAmbienttoSampleNode, valvesDict=valves)
             time.sleep(1.)
 
