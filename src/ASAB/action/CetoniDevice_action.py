@@ -401,9 +401,13 @@ def provideSample(
                                     f"time to be waited: {timer.get_msecs_to_expiration()/1000.} s, {timer.get_msecs_to_expiration()/60000.} min")
     # Wait and check the two conditions
     while ((not timer.is_expired()) and
-        (list(pumpsFlows.keys()) ==
-        CetoniDevice_driver.cetoni.pumpingPumps(pumpsDict=pumps))):
+        (all(
+            [pumpKey in
+            CetoniDevice_driver.cetoni.pumpingPumps(pumpsDict=pumps)
+            for pumpKey in list(pumpsFlows.keys())
+            ]))):
         time.sleep(0.1)
+
     # Stop all pumps
     CetoniDevice_driver.pumpObj.stop_all_pumps()
     # drain the residues from the path, if the sample was not provided to a device
